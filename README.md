@@ -91,9 +91,7 @@ import (
  "io"
  "github.com/mh-cbon/template-compiler/compiled"
  "github.com/mh-cbon/template-compiler/std/text/template/parse"
- "text/template"
- "strconv"
- dataalias "github.com/mh-cbon/template-compiler/demo/data"
+ "path/to/mypackage"
 )
 
 func init () {
@@ -103,8 +101,8 @@ func init () {
 
 func fnaTplaTpl0(t parse.Templater, w io.Writer, indata interface {
 }) error {
-  var data dataalias.MyTemplateData
-  if d, ok := indata.(dataalias.MyTemplateData); ok {
+  var data mypackage.TplData
+  if d, ok := indata.(mypackage.TplData); ok {
   	data = d
   }
   var writeErr error
