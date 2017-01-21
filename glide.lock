@@ -1,0 +1,20 @@
+hash: cb7f0d8d09480c7c92d76f8975a4a06fe97889c874c8b8d230ac5de170adef8c
+updated: 2017-01-20T11:53:02.218549754+01:00
+imports:
+- name: github.com/mh-cbon/export-funcmap
+  version: 2e7522e06e5657fae88e4e1fdec0fdbb8b1f440c
+  subpackages:
+  - export
+- name: github.com/mh-cbon/template-tree-simplifier
+  version: 524c52b625246eb8a4e633af12c9cc0b89f2b62c
+  subpackages:
+  - simplifier
+- name: github.com/serenize/snaker
+  version: 543781d2b79bd95c51ffe70e70a55c946ca211ff
+- name: golang.org/x/tools
+  version: fcfba28e23c7bbd8474b355ca7d6a9d88afcca00
+  subpackages:
+  - go/ast/astutil
+  - go/buildutil
+  - go/loader
+testImports: []

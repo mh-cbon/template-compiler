@@ -1,0 +1,10 @@
+package: github.com/mh-cbon/template-compiler
+import:
+- package: github.com/mh-cbon/export-funcmap
+  version: ^0.0.1-beta
+  subpackages:
+  - export
+- package: github.com/mh-cbon/template-tree-simplifier
+  subpackages:
+  - simplifier
+- package: github.com/serenize/snaker
