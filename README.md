@@ -103,26 +103,26 @@ func init () {
 
 func fnaTplaTpl0(t parse.Templater, w io.Writer, indata interface {
 }) error {
-	var data dataalias.MyTemplateData
-	if d, ok := indata.(dataalias.MyTemplateData); ok {
-		data = d
-	}
-	var writeErr error
+  var data dataalias.MyTemplateData
+  if d, ok := indata.(dataalias.MyTemplateData); ok {
+  	data = d
+  }
+  var writeErr error
   var var0 string = data.Email
-	_, writeErr = w.Write(var0)
-	if writeErr != nil {
-		return writeErr
-	}
-	_, writeErr = w.Write(builtin0)
-	if writeErr != nil {
-		return writeErr
-	}
+  _, writeErr = w.Write(var0)
+  if writeErr != nil {
+  	return writeErr
+  }
+  _, writeErr = w.Write(builtin0)
+  if writeErr != nil {
+  	return writeErr
+  }
   var var1 string = data.Name
-	_, writeErr = w.Write(var0)
-	if writeErr != nil {
-		return writeErr
-	}
-	return nil
+  _, writeErr = w.Write(var0)
+  if writeErr != nil {
+  	return writeErr
+  }
+  return nil
 }
 var builtin0 = []byte(" ")
 
@@ -130,7 +130,7 @@ var builtin0 = []byte(" ")
 
 ### What would be the performance improvements ?
 
-Given the templates available [here](...)
+Given the templates available [here](https://github.com/mh-cbon/template-compiler/tree/master/demo/templates)
 
 ```sh
 $ go test -bench=.
