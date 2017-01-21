@@ -63,10 +63,6 @@ func (r *Compiled) Execute(wr io.Writer, data interface{}) error {
 	return r.executeFn(r, wr, data)
 }
 
-type templateExecute interface {
-	executeFn(io.Writer, string, interface{}) error
-}
-
 // ExecuteTemplate invokes the compiled template function.
 func (r *Compiled) ExecuteTemplate(wr io.Writer, name string, data interface{}) error {
 	// its important to bypass Template.ExecuteTemplate method.
