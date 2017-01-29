@@ -286,23 +286,24 @@ It would be great to backport those changes into core go code to get ride of tho
 `Compiled` has a `*parse.Tree`. This tree is a bultin tree to hold only one node to execute the compiled function.
 Doing so allow to mix compiled and non-compiled templates.
 [see here](https://github.com/mh-cbon/template-compiler/blob/master/std/text/template/compiled.go#L31)
-2. Added new methods on `text/template`, `GetFuncs()` to get the funcs related to the template.
+2. Added a new method `text/template.GetFuncs()` to get the funcs related to the template.
 This is usefull to the compiled template functions to get access to those unexported functions.
-Added `Compiled()` to attach a compiled template to a regular `text/template` instance.
 [see here](https://github.com/mh-cbon/template-compiler/blob/master/std/text/template/compiled.go#L26)
-3. Added a new tree node `text/template/parse.CompiledNode`, which knows the function to execute
+3. Added `text/template.Compiled()` to attach a compiled template to a regular `text/template` instance.
+[see here](https://github.com/mh-cbon/template-compiler/blob/master/std/text/template/compiled.go#L26)
+4. Added a new tree node `text/template/parse.CompiledNode`, which knows the function to execute
 for a compiled template.
 [see here](https://github.com/mh-cbon/template-compiler/blob/master/std/text/template/parse/compiled.go#L10)
-4. Added a new interface `text/template/parse.Templater`,
+5. Added a new interface `text/template/parse.Templater`,
 to use in the compiled function to receive the current template executed. This instance can be one of
 `text/template.Template`, `html/template.Template` or `text/template.Compiled`.
 [see here](https://github.com/mh-cbon/template-compiler/blob/master/std/text/template/parse/compiled.go#L18)
-5. Added a new type `CompiledTemplateFunc` for the signature of a compiled template function.
+6. Added a new type `CompiledTemplateFunc` for the signature of a compiled template function.
 [see here](https://github.com/mh-cbon/template-compiler/blob/master/std/text/template/parse/compiled.go#L24)
-6. Added a new funcmap variable `html/template.publicFuncMap` to map all html template idents to a function.
+7. Added a new funcmap variable `html/template.publicFuncMap` to map all html template idents to a function.
 It also delcares all escapers to a public function to improve performance of compiled templates.
 [see here](https://github.com/mh-cbon/template-compiler/blob/master/std/html/template/compiled.go#L6)
-7. Added support of CompiledNode to the state walker
+8. Added support of CompiledNode to the state walker
 [see here](https://github.com/mh-cbon/template-compiler/blob/master/std/text/template/exec.go#L247)
 
 # TBD
