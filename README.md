@@ -73,8 +73,8 @@ package mypackage
 import (
   "net/http"
 
-	"github.com/mh-cbon/template-compiler/compiled"
-	"github.com/mh-cbon/template-compiler/std/text/template"
+  "github.com/mh-cbon/template-compiler/compiled"
+  "github.com/mh-cbon/template-compiler/std/text/template"
 )
 
 //go:generate template-compiler
