@@ -79,17 +79,17 @@ import (
 
 //go:generate template-compiler
 var compiledTemplates = compiled.New(
-	"gen.go",
-	[]compiled.TemplateConfiguration{
-		compiled.TemplateConfiguration{
-			HTML:          true,
-			TemplatesPath: "tmpl/*.tpl",
-			Data:          TplData{},
-			FuncsMap:      []string{
+  "gen.go",
+  []compiled.TemplateConfiguration{
+    compiled.TemplateConfiguration{
+      HTML:          true,
+      TemplatesPath: "tmpl/*.tpl",
+      Data:          TplData{},
+      FuncsMap:      []string{
         "somewhere/mypackage:tplFuncs",
       },
-		},
-	},
+    },
+  },
 )
 
 var tplFuncs = map[string]interface{}{
