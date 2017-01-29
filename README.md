@@ -250,6 +250,17 @@ Functions declared into the funcmap can be `exported`, `unexported`, or inlined.
 
 Note that `unexported` functions needs some runtime type checking.
 
+__examples__
+
+If you like [sprig](https://github.com/Masterminds/sprig), you d be able to consume those functions with the path,
+
+`github.com/Masterminds/sprig:genericMap`
+
+If you prefer [gtf](https://github.com/leekchan/gtf), you d be able to consume those functions with the path,
+
+`github.com/leekchan/gtf:GtfFuncMap`
+
+
 __beware__
 
 it can t evaluate a function call! It must be a variable declaration into the top level context such as
