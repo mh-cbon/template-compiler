@@ -19,7 +19,6 @@ var compiledTemplates = compiled.New(
 			HTML:          true,
 			TemplatesPath: "templates/*.tpl",
 			Data:          data.MyTemplateData{},
-			FuncsMap:      []string{},
 		},
 	},
 ).SetPkg("main")
