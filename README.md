@@ -284,6 +284,7 @@ It would be great to backport those changes into core go code to get ride of tho
 
 1. Added a new `text/template.Compiled` type. Much like a `text/template` or an `html/template`,
 `Compiled` has a `*parse.Tree`. This tree is a bultin tree to hold only one node to execute the compiled function.
+Doing so allow to mix compiled and non-compiled templates.
 [see here](https://github.com/mh-cbon/template-compiler/blob/master/std/text/template/compiled.go#L31)
 2. Added new methods on `text/template`, `GetFuncs()` to get the funcs related to the template.
 This is usefull to the compiled template functions to get access to those unexported functions.
