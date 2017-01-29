@@ -2,6 +2,8 @@
 
 Compile your `text/template` / `html/template` to regular go code.
 
+still a wip!
+
 # Install
 
 You will need both library and binary.
