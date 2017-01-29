@@ -163,7 +163,7 @@ func prepareConfiguration(importsContext []*ast.ImportSpec, confNode *ast.GenDec
 	// find templates argument, then look for each compiled.TemplateConfiguration{},
 	// then browse each key / value expression,
 	// - for an HTML key, check if it says true/false
-	// - for a Data key, creates and a DataConfiguration{}
+	// - for a Data key, creates and adds a DataConfiguration{}
 	// - for a FuncsMap key, exports them to their symbolic version, and their public idents,
 	//   add those new data to the configuration of the template.
 	templatesConf := compiledNew.Args[1].(*ast.CompositeLit)
@@ -186,7 +186,6 @@ func prepareConfiguration(importsContext []*ast.ImportSpec, confNode *ast.GenDec
 		}
 
 		// manage FuncsMap key
-		// todo, handle the nil case.
 		var varToExport []string
 		if funcsMapKey := getKeyValue(templateConf, "FuncsMap"); funcsMapKey != nil {
 			varToExport = getFuncsMapKeyValues(funcsMapKey.Value.(*ast.CompositeLit))

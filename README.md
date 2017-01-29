@@ -204,13 +204,13 @@ With those hints `template-compiler` can locate and consume the variable declare
 3. The generation of the bootstrap program is about parsing, browsing, and re exporting
 an updated version of your configuration variable.
 It specifically looks for each `compiled.TemplateConfiguration{}`:
-- If the configuration is set to generate html content with the key `HTML:true`,
-  it ensure that stdfunc are appropriately declared into the configuration.
-- It read and evaluates the data field `Data: your.struct{}`,
-  generates a `DataConfiguration{}` of it, and adds it to the template configuration.
-- It checks for `FuncsMap` key, and export those variable targets
-  (with the help of [this package](https://github.com/mh-cbon/export-funcmap))
-  to `FuncsExport` and `PublicIdents` keys.
+  - If the configuration is set to generate html content with the key `HTML:true`,
+    it ensure that stdfunc are appropriately declared into the configuration.
+  - It read and evaluates the data field `Data: your.struct{}`,
+    generates a `DataConfiguration{}` of it, and adds it to the template configuration.
+  - It checks for `FuncsMap` key, and export those variable targets
+    (with the help of [this package](https://github.com/mh-cbon/export-funcmap))
+    to `FuncsExport` and `PublicIdents` keys.
  [We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L117)
 4. `template-compiler` writes and compiles a go program into
 `$GOPATH/src/template-compilerxxx`.
@@ -222,18 +222,18 @@ This program is made to compile the templates with the updated configuration.
 for each template path, it compiles it as `text/template` or `html/template`.
 This steps creates the standard template AST Tree. Each template tree is then
 transformed and simplified [with the help of this package](https://github.com/mh-cbon/template-tree-simplifier).
-[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L103)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L80)
 7. `template-tree-simplifier` takes in input the template tree and apply transformations:
   - It unshadows all variables declaration within the template.
   - It renames all template variables to prefix them with `tpl`
   - It simplifies structure such as `{{"son" | split "wat"}}` to `{{$var0 := split "wat" "son"}}{{$var0}}`
   - It produces a small type checker structure which registers variable and their type for each scope of the template.
-[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L323)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L348)
 8. `bootstrap-program` browses each simplified template tree, generates a go function corresponding to it.
-[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L77)
-9. `bootstrap-program` generates an `init` function with registers the new functions as their templates names to
-your configuration variable.
-[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L204)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/convert.go#L75)
+9. `bootstrap-program` generates an `init` function to register to
+your configuration variable the new functions as their template name.
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L222)
 10. `bootstrap-program` writes the fully generated program.
 
 ### Working with funcmap

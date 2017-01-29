@@ -10,11 +10,11 @@ import (
 	aliastemplate "github.com/mh-cbon/template-compiler/std/html/template"
 )
 
-var builtin0 = []byte("Hello from a!\n")
-var builtin1 = []byte("Hello from b!\n")
 var builtin2 = []byte("\n")
 var builtin3 = []byte(" World!\n")
 var builtin4 = []byte("Hello")
+var builtin0 = []byte("Hello from a!\n")
+var builtin1 = []byte("Hello from b!\n")
 
 
 func init () {
