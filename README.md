@@ -85,7 +85,9 @@ var compiledTemplates = compiled.New(
 			HTML:          true,
 			TemplatesPath: "tmpl/*.tpl",
 			Data:          TplData{},
-			FuncsMap:      []string{},
+			FuncsMap:      []string{
+        "somewhere/mypackage:tplFuncs",
+      },
 		},
 	},
 )
