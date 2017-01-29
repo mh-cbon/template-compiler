@@ -192,10 +192,11 @@ to the write of the compiled go code.
 
 1. When `go:generate` is invoked, the go tool will parse and invoke your calls to
 `template-compiler`. `template-compiler` is invoked in the directory containing the file
-with the `go:generate` comment, it also declare an environment variable `GOFILE`.
-With those `template-compiler` can locate and consume the variable declared with `-var` parameter.
-[We are here](..url to main.go)
-2. `template-compiler` will generate a bootstrap program. [We are here](..url to GenerateProgramBootstrap)
+with the `go:generate` comment, `go generate` also declares an environment variable `GOFILE`.
+With those hints `template-compiler` can locate and consume the variable declared with `-var` parameter.
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/main.go#L17)
+2. `template-compiler` will generate a bootstrap program.
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L21)
 3. The generation of the bootstrap program is about parsing, browsing, and re exporting
 an updated version of your configuration variable.
 It specifically looks for each `compiled.TemplateConfiguration{}`:
@@ -204,30 +205,31 @@ It specifically looks for each `compiled.TemplateConfiguration{}`:
 - It read and evaluates the data field `Data: your.struct{}`,
   generates a `DataConfiguration{}` of it, and adds it to the template configuration.
 - It checks for `FuncsMap` key, and export those variable targets
-  (with the help of [this package](url to export funcmap package))
+  (with the help of [this package](https://github.com/mh-cbon/export-funcmap))
   to `FuncsExport` and `PublicIdents` keys.
- [We are here](..url to prepareConfiguration)
+ [We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L117)
 4. `template-compiler` writes and compiles a go program into
 `$GOPATH/src/template-compilerxxx`.
 This program is made to compile the templates with the updated configuration.
-[We are here](..url to makeProgram)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L93)
 5. `bootstrap-program` is now invoked.
-[We are here](..url to invokeProgram)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/main.go#L72)
 6. `bootstrap-program` browses the configuration value,
 for each template path, it compiles it as `text/template` or `html/template`.
 This steps creates the standard template AST Tree. Each template tree is then
-transformed and simplified [with the help of this package](url to tree simplifier).
-[We are here](..url to Compile)
+transformed and simplified [with the help of this package](https://github.com/mh-cbon/template-tree-simplifier).
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L103)
 7. `template-tree-simplifier` takes in input the template tree and apply transformations:
   - It unshadows all variables declaration within the template.
   - It renames all template variables to prefix them with `tpl`
   - It simplifies structure such as `{{"son" | split "wat"}}` to `{{$var0 := split "wat" "son"}}{{$var0}}`
   - It produces a small type checker structure which registers variable and their type for each scope of the template.
-[We are here](..url to PrepareTemplates)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L323)
 8. `bootstrap-program` browses each simplified template tree, generates a go function corresponding to it.
-[We are here](..url to convertTplTree)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L77)
 9. `bootstrap-program` generates an `init` function with registers the new functions as their templates names to
 your configuration variable.
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L204)
 10. `bootstrap-program` writes the fully generated program.
 
 ### Working with funcmap
@@ -238,7 +240,7 @@ In that matter `template-compiler` can take in input a path to a variable declar
 
 `pkgPath:variableName` where `pkgPath` is the go pakage path such as `text/template`,
 the variable name is the name of the variable declaring the funcmap such as `builtins`.
-See [this](... url to text/template:builtins).
+See [this](https://golang.org/src/text/template/funcs.go#L26).
 
 It can read `map[string]interface{}` or `template.FuncMap`.
 
@@ -282,23 +284,25 @@ It would be great to backport those changes into core go code to get ride of tho
 
 1. Added a new `text/template.Compiled` type. Much like a `text/template` or an `html/template`,
 `Compiled` has a `*parse.Tree`. This tree holds is bultin tree to hold only one node to execute a function.
-[see here](...url to the file.)
+[see here](https://github.com/mh-cbon/template-compiler/blob/master/std/text/template/compiled.go#L31)
 2. Added new methods on `text/template`, `GetFuncs()` to get the funcs related to the template.
 This is usefull to the compiled template functions to get access to those unexported functions.
 Added `Compiled()` to attach a compiled template to a regular `text/template` instance.
-[see here](...url to the file.)
+[see here](https://github.com/mh-cbon/template-compiler/blob/master/std/text/template/compiled.go#L26)
 3. Added a new tree node `text/template/parse.CompiledNode`, which knows the function to execute
 for a compiled template.
-[see here](...url to the file.)
+[see here](https://github.com/mh-cbon/template-compiler/blob/master/std/text/template/parse/compiled.go#L10)
 4. Added a new interface `text/template/parse.Templater`,
 to use in the compiled function to receive the current template executed. This instance can be one of
 `text/template.Template`, `html/template.Template` or `text/template.Compiled`.
-[see here](...url to the file.)
+[see here](https://github.com/mh-cbon/template-compiler/blob/master/std/text/template/parse/compiled.go#L18)
 5. Added a new type `CompiledTemplateFunc` for the signature of a compiled template function.
-[see here](...url to the file.)
+[see here](https://github.com/mh-cbon/template-compiler/blob/master/std/text/template/parse/compiled.go#L24)
 6. Added a new funcmap variable `html/template.publicFuncMap` to map all html template idents to a function.
 It also delcares all escapers to a public function to improve performance of compiled templates.
-[see here](...url to the file.)
+[see here](https://github.com/mh-cbon/template-compiler/blob/master/std/html/template/compiled.go#L6)
+7. Added support of CompiledNode to the state walker
+[see here](https://github.com/mh-cbon/template-compiler/blob/master/std/text/template/exec.go#L247)
 
 # TBD
 
