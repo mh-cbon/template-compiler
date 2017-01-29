@@ -6,12 +6,23 @@ import (
 	"os"
 
 	"github.com/mh-cbon/template-compiler/compiled"
+	"github.com/mh-cbon/template-compiler/demo/data"
 	"github.com/mh-cbon/template-compiler/std/text/template"
 	"github.com/mh-cbon/template-compiler/std/text/template/parse"
 )
 
-//go:generate template-compiler -html -tpl "templates/*.tpl" -out "gen.go" -var compiledTemplates -data github.com/mh-cbon/template-compiler/demo/data:MyTemplateData
-var compiledTemplates *compiled.Registry
+//go:generate template-compiler -print -var compiledTemplates
+var compiledTemplates = compiled.New(
+	"gen.go",
+	[]compiled.TemplateConfiguration{
+		compiled.TemplateConfiguration{
+			HTML:          true,
+			TemplatesPath: "templates/*.tpl",
+			Data:          data.MyTemplateData{},
+			FuncsMap:      []string{},
+		},
+	},
+).SetPkg("main")
 
 func main() {
 

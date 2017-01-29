@@ -1,8 +1,6 @@
 package compiled
 
 import (
-	"reflect"
-
 	"github.com/mh-cbon/template-compiler/std/text/template"
 	"github.com/mh-cbon/template-compiler/std/text/template/parse"
 )
@@ -14,36 +12,31 @@ func NewRegistry() *Registry {
 	}
 }
 
-// Registry is a regisrty to map template path to their compiled funcs.
+// Registry registers compiled templates by their name.
 type Registry struct {
 	templates map[string]*template.Compiled
 }
 
-// Add registers a compiled template func.
+// Add registers a func as a compiled template with given name.
 func (t Registry) Add(name string, fn parse.CompiledTemplateFunc) {
 	t.templates[name] = template.NewCompiled(name, fn)
 }
 
-// Get provides a compiled func for a template path
+// Get provides a compiled template matching given name.
 func (t Registry) Get(name string) *template.Compiled {
 	return t.templates[name]
 }
 
-// Set a compiled template.
+// Set a compiled template as given name.
 func (t Registry) Set(name string, tpl *template.Compiled) {
 	t.templates[name] = tpl
 }
 
-// MustGet provides a compiled func for a template path,
-// it panics if the template cannot be found.
+// MustGet provides the compiled template matching given name,
+// it panics if the template is not found.
 func (t Registry) MustGet(name string) *template.Compiled {
 	if t, ok := t.templates[name]; ok {
 		return t
 	}
 	panic("template not found")
-}
-
-// EvaluateFuncCall ...
-func EvaluateFuncCall(fn reflect.Value, args ...interface{}) interface{} {
-	return nil
 }

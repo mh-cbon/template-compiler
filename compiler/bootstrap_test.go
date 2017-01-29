@@ -2,166 +2,381 @@ package compiler
 
 import (
 	"fmt"
+	"go/ast"
+	"strings"
 	"testing"
+
+	"github.com/mh-cbon/template-compiler/compiled"
 )
 
 type BootstrapTestData struct {
-	// the templates file path to compile
-	tplsPath []string
-	// the path to the output path containing the compiled template
-	outPath string
-	// the variable name of the compiled.Registry
-	varName string
-	// the type of template compilation
-	isHTML bool
-	// the data type selector such pkgPath:type
-	data string
-	// the funcmap selectors to export
-	// such text/template:builtins
-	funcExports []string
-	// the expected program output
-	expectedProgram string
-	// will it fail
-	expectErr bool
-	// the err message
-	expectedErr string
-	// notes, it is not possible to check for
-	// funcExports, because it is exported as a map,
-	// a map does not guarantee order of keys,
-	// so the same result can produce different order...
+	// the content of the source program
+	srcProgram string
+	// the name of the configuration variable in the source prgoram
+	srcVar string
+	// if it is expected to fail to compile, this error should contain the same message
+	expectErr error
+	// the list of expected imports to find in the program, noted as alias:path, or just path
+	expectedImports []string
+	// is the new var ast.node expect to be an Ident or a CallExpr
+	expectedNewVarAsCall bool
+	// the expected alias of compiled package, if any
+	expectedCompiledAlias string
+	// the expected value of the first argument
+	expectedOutPath string
+	// the expected length of template configuration values
+	expectedLenOfTemplateConfig int
+	// the expected length of shared funcmap
+	expectedLenOfAllTemplatesFuncsMap int
+	// self explanatory
+	expectedToBeHTMLTemplates []bool
+	// self explanatory
+	expectedDataConfigurations []compiled.DataConfiguration
 }
 
 func TestBootstrap(t *testing.T) {
-
 	allTestData := []BootstrapTestData{
 		BootstrapTestData{
-			tplsPath:    []string{"a.tpl", "b.tpl"},
-			outPath:     "program.go",
-			varName:     "registryVarName",
-			isHTML:      true,
-			data:        "pkg/path:type",
-			funcExports: []string{"text/template:builtins"},
-			expectErr:   true,
-			expectedErr: "Unexpected private data type. The data type must be exported, got <type>",
-		},
-		BootstrapTestData{
-			tplsPath:    []string{"a.tpl", "b.tpl"},
-			outPath:     "program.go",
-			varName:     "registryVarName",
-			isHTML:      true,
-			data:        "pkg/path:Type",
-			funcExports: []string{"github.com/mh-cbon/template-compiler/compiler:emptyFunc"},
-			expectedProgram: `package main
+			srcProgram: `package yy
 
 import (
-  "fmt"
-  "github.com/mh-cbon/template-compiler/compiler"
-  "io/ioutil"
-  "os"
-  "pkg/path"
+	"github.com/mh-cbon/template-compiler/compiled"
+	"github.com/mh-cbon/template-compiler/demo/data"
 )
 
-var tplsPath = []string{"a.tpl", "b.tpl"}
+var compiled = compiled.New(
+	"gen.go",
+	[]compiled.TemplateConfiguration{
+		compiled.TemplateConfiguration{
+			TemplatesPath: "templates/*.tpl",
+			Data:          data.MyTemplateData{},
+		},
+	},
+)`,
+			srcVar: `compiled`,
+			expectedImports: []string{
+				"fmt",
+				"github.com/mh-cbon/template-compiler/compiled",
+				"github.com/mh-cbon/template-compiler/compiler",
+				"github.com/mh-cbon/template-compiler/demo/data",
+			},
+			expectedOutPath:             "gen.go",
+			expectedLenOfTemplateConfig: 1,
+			expectedToBeHTMLTemplates:   []bool{false},
+			expectedDataConfigurations: []compiled.DataConfiguration{
+				compiled.DataConfiguration{
+					IsPtr:        false,
+					DataTypeName: "MyTemplateData",
+					DataType:     "data.MyTemplateData",
+					PkgPath:      "github.com/mh-cbon/template-compiler/demo/data",
+				},
+			},
+		},
+		BootstrapTestData{
+			srcProgram: `package yy
 
-var outPath = "program.go"
+import (
+	"github.com/mh-cbon/template-compiler/compiled"
+	"github.com/mh-cbon/template-compiler/demo/data"
+)
 
-var varName = "registryVarName"
+var compiled = compiled.New(
+	"gen.go",
+	[]compiled.TemplateConfiguration{
+		compiled.TemplateConfiguration{
+			HTML:          true,
+			TemplatesPath: "templates/*.tpl",
+			Data:          data.MyTemplateData{},
+			FuncsMap:      []string{"github.com/mh-cbon/template-compiler/compiler:emptyFunc"},
+		},
+	},
+).SetPkg("main")`,
+			srcVar: `compiled`,
+			expectedImports: []string{
+				"fmt",
+				"github.com/mh-cbon/template-compiler/compiled",
+				"github.com/mh-cbon/template-compiler/compiler",
+				"github.com/mh-cbon/template-compiler/demo/data",
+			},
+			expectedNewVarAsCall:        true,
+			expectedOutPath:             "gen.go",
+			expectedLenOfTemplateConfig: 1,
+			expectedToBeHTMLTemplates:   []bool{true},
+			expectedDataConfigurations: []compiled.DataConfiguration{
+				compiled.DataConfiguration{
+					IsPtr:        false,
+					DataTypeName: "MyTemplateData",
+					DataType:     "data.MyTemplateData",
+					PkgPath:      "github.com/mh-cbon/template-compiler/demo/data",
+				},
+			},
+		},
+		BootstrapTestData{
+			srcProgram: `package yy
 
-var dataPkg = "pkg/path"
+import (
+	tomate "github.com/mh-cbon/template-compiler/compiled"
+	"github.com/mh-cbon/template-compiler/demo/data"
+)
 
-var dataType = "Type"
-
-var dataValue = path.Type{}
-
-var isHTML = true
-
-var funcsMap = map[string]interface {
-}{}
-
-var funcsMapPublic []map[string]string = []map[string]string(nil)
-
-func main() {
-  pkgName, err := compiler.LookupPackageName(outPath)
-  if err != nil {
-    panic(fmt.Errorf("Failed to lookup for the package name: %v", err))
-  }
-  tpls, err := compiler.PrepareTemplates(tplsPath, isHTML, funcsMap)
-  if err != nil {
-    panic(fmt.Errorf("Failed to prepare the templates: %v", err))
-  }
-  program, err := compiler.Compile(tpls, pkgName, varName, dataPkg, dataType, dataValue, funcsMap, funcsMapPublic)
-  if err != nil {
-    panic(fmt.Errorf("Failed to compile the templates: %v", err))
-  }
-  if err := ioutil.WriteFile(outPath, []byte(program), os.ModePerm); err != nil {
-    panic(fmt.Errorf("Failed to write the compiled templates: %v", err))
-  }
-}`,
+var compiled = tomate.New(
+	"somethingelse.go",
+	[]compiled.TemplateConfiguration{
+		compiled.TemplateConfiguration{
+			HTML:          true,
+			TemplatesPath: "templates/*.tpl",
+			Data:          data.MyTemplateData{},
+			FuncsMap:      []string{},
+		},
+		compiled.TemplateConfiguration{
+			TemplatesPath: "templates/*.tpl",
+			Data:          &data.MyTemplateData{},
+			FuncsMap:      []string{},
+		},
+	},
+  "github.com/mh-cbon/template-compiler/compiler:emptyFunc",
+)`,
+			srcVar: `compiled`,
+			expectedImports: []string{
+				"fmt",
+				"tomate:github.com/mh-cbon/template-compiler/compiled",
+				"github.com/mh-cbon/template-compiler/compiler",
+				"github.com/mh-cbon/template-compiler/demo/data",
+			},
+			expectedCompiledAlias:       "tomate",
+			expectedOutPath:             "somethingelse.go",
+			expectedLenOfTemplateConfig: 2,
+			expectedToBeHTMLTemplates:   []bool{true, false},
+			expectedDataConfigurations: []compiled.DataConfiguration{
+				compiled.DataConfiguration{
+					IsPtr:        false,
+					DataTypeName: "MyTemplateData",
+					DataType:     "data.MyTemplateData",
+					PkgPath:      "github.com/mh-cbon/template-compiler/demo/data",
+				},
+				compiled.DataConfiguration{
+					IsPtr:        true,
+					DataTypeName: "MyTemplateData",
+					DataType:     "data.MyTemplateData",
+					PkgPath:      "github.com/mh-cbon/template-compiler/demo/data",
+				},
+			},
 		},
 	}
 
 	for i, testData := range allTestData {
-		program, err := GenerateProgramBootstrap(
-			testData.tplsPath,
-			testData.outPath,
-			testData.varName,
-			testData.isHTML,
-			testData.data,
-			testData.funcExports...,
-		)
-		if err != nil && !testData.expectErr {
-			t.Errorf("Test(%v): got err=%v", i, err)
-			break
-		} else if testData.expectErr {
-			if fmt.Sprint(err) != testData.expectedErr {
-				t.Errorf(
-					"Test(%v): Invalid error output. Expected\n%q\n\nGot\n%q\n",
-					i,
-					testData.expectedErr,
-					err,
-				)
-			}
-		} else {
-			program = formatGoCode(program)
-			expectedProgram := formatGoCode(testData.expectedProgram)
-			if err := compare(program, expectedProgram); err != nil {
-				fmt.Println(program)
-				t.Errorf("Test(%v): got err=%v", i, err)
-			}
-			// if program != expectedProgram {
-			// 	t.Errorf(
-			// 		"Test(%v): Invalid program output. Expected\n%v\n\nGot\n%v\n",
-			// 		i,
-			// 		expectedProgram,
-			// 		program,
-			// 	)
-			// }
-		}
-	}
-}
+		program, err := GenerateProgramBootstrapFromString(testData.srcProgram, testData.srcVar)
 
-func compare(s1, s2 string) error {
-	line := 0
-	leftContent := ""
-	rightContent := ""
-	for i, s := range s1 {
-		leftContent += string(s)
-		if s == rune('\n') {
-			line++
+		if testData.expectErr != nil {
+			if err == nil {
+				t.Errorf("Test(%v): Expected to fail, but got err=%v", i, err)
+				return
+			} else if err.Error() != testData.expectErr.Error() {
+				t.Errorf("Test(%v): Expected to fail with the message=%v but got err=%v", i, testData.expectErr, err)
+				return
+			}
 		}
-		if i >= len(s2) {
-			return fmt.Errorf("content too small at line %v, line=%q", line, leftContent)
+
+		if err != nil {
+			t.Errorf("Test(%v): Expected to succeed, but got an error=%v", i, err)
+			return
 		}
-		rightContent += string(s2[i])
-		if rune(s2[i]) != s {
-			return fmt.Errorf("invalid content at pos=%v line %v\nleft=%v\nright=%v", i, line, leftContent, rightContent)
+
+		if program == "" {
+			t.Errorf("Test(%v): Unexpected empty program", i)
+			return
 		}
-		if s == rune('\n') {
-			leftContent = ""
+
+		parsedProgram, err := parseGoString(program)
+		if err != nil {
+			t.Errorf("Test(%v): Failed to parse the program=%v", i, program)
+			return
 		}
-		if s2[i] == '\n' {
-			rightContent = ""
+
+		if parsedProgram.Name.Name != "main" {
+			t.Errorf("Test(%v): Invalid package name=%v", i, parsedProgram.Name.Name)
+			return
+		}
+
+		importSpecs := extractImports(parsedProgram)
+		imports := convertImportsSpecs(importSpecs)
+		if len(testData.expectedImports) != len(imports) {
+			t.Errorf("Test(%v): Expected to get %v import statements, but found %v\n\n%v",
+				i, len(testData.expectedImports), len(imports), program)
+			return
+		}
+
+		for _, im := range imports {
+			if containsStr(testData.expectedImports, im) == false {
+				t.Errorf("Test(%v): Found unexpected import=%v\n\n%v", i, im, program)
+				return
+			}
+		}
+
+		for _, im := range testData.expectedImports {
+			if containsStr(imports, im) == false {
+				t.Errorf("Test(%v): Expected to find import=%v\n\n%v", i, im, program)
+				return
+			}
+		}
+
+		newConfVar := extractVar(parsedProgram, testData.srcVar)
+		if newConfVar == nil {
+			t.Errorf("Test(%v): Expected to find the configuration var=%v\n\n%v", i, testData.srcVar, program)
+			return
+		}
+
+		var compileConf *ast.CallExpr
+		rightHand := newConfVar.Specs[0].(*ast.ValueSpec).Values[0].(*ast.CallExpr).Fun.(*ast.SelectorExpr)
+		if testData.expectedNewVarAsCall == false {
+			if _, ok := rightHand.X.(*ast.Ident); ok == false {
+				t.Errorf("Test(%v): Expected to find an Ident, but found=%T\n\n%v", i, rightHand.X, program)
+				return
+			}
+			compileConf = newConfVar.Specs[0].(*ast.ValueSpec).Values[0].(*ast.CallExpr)
+		} else {
+			if _, ok := rightHand.X.(*ast.CallExpr); ok == false {
+				t.Errorf("Test(%v): Expected to find a CallExpr, but found=%T\n\n%v", i, rightHand.X, program)
+				return
+			}
+			compileConf = rightHand.X.(*ast.CallExpr)
+		}
+
+		compiledAlias := compileConf.Fun.(*ast.SelectorExpr).X.(*ast.Ident).Name
+		if testData.expectedCompiledAlias == "" && compiledAlias != "compiled" {
+			t.Errorf("Test(%v): Expected to find compiled alias as 'compiled', but found=%v\n\n%v", i, compiledAlias, program)
+			return
+		} else if testData.expectedCompiledAlias != "" && testData.expectedCompiledAlias != compiledAlias {
+			t.Errorf("Test(%v): Expected to find compiled alias as '%v', but found=%v\n\n%v",
+				i, testData.expectedCompiledAlias, compiledAlias, program)
+			return
+		}
+
+		firstArg := compileConf.Args[0].(*ast.BasicLit).Value
+		firstArg = firstArg[1 : len(firstArg)-1]
+		if testData.expectedOutPath != firstArg {
+			t.Errorf("Test(%v): Expected to find the first arg value=%v, but got=%v\n\n%v",
+				i, testData.expectedOutPath, firstArg, program)
+			return
+		}
+
+		templatesConf := compileConf.Args[1].(*ast.CompositeLit)
+		if testData.expectedLenOfTemplateConfig != len(templatesConf.Elts) {
+			t.Errorf("Test(%v): Expected a length of template configuration=%v, but got=%v\n\n%v",
+				i, testData.expectedLenOfTemplateConfig, len(templatesConf.Elts), program)
+			return
+		}
+
+		for e, y := range templatesConf.Elts {
+			templateConf := y.(*ast.CompositeLit)
+			templateConfStr := astNodeToString(templateConf)
+			//-
+			expectedHTML := testData.expectedToBeHTMLTemplates[e]
+			gotHTML := isAnHTMLTemplateConf(templateConf)
+			if expectedHTML != gotHTML {
+				t.Errorf("Test(%v): Expected template configuration(%v) to be HTML=%v, but got=%v\n\n%v",
+					i, e, expectedHTML, gotHTML, templateConfStr)
+				return
+			}
+			//-
+			expectedDataConfig := testData.expectedDataConfigurations[e]
+			dataKey := getKeyValue(templateConf, "DataConfiguration")
+			gotDataConfig := astNodeToString(dataKey)
+			//-
+			isPtrExpect := "IsPtr: false"
+			if expectedDataConfig.IsPtr {
+				isPtrExpect = "IsPtr: true"
+			}
+			if strings.Index(gotDataConfig, isPtrExpect) == -1 {
+				t.Errorf("Test(%v): Expected template data configuration(%v) to contain IsPtr=%v, but got=%v\n\n%v",
+					i, e, expectedDataConfig.IsPtr, !expectedDataConfig.IsPtr, gotDataConfig)
+				return
+			}
+			//-
+			DataTypeNameExpect := fmt.Sprintf("DataTypeName: %q", expectedDataConfig.DataTypeName)
+			if strings.Index(gotDataConfig, DataTypeNameExpect) == -1 {
+				t.Errorf("Test(%v): Expected template data configuration(%v) to contain DataTypeName=%v, but got=%v\n\n%v",
+					i, e, DataTypeNameExpect, "something different :x", gotDataConfig)
+				return
+			}
+			//-
+			DataTypeExpect := fmt.Sprintf("DataType: %q", expectedDataConfig.DataType)
+			if strings.Index(gotDataConfig, DataTypeExpect) == -1 {
+				t.Errorf("Test(%v): Expected template data configuration(%v) to contain DataType=%v, but got=%v\n\n%v",
+					i, e, DataTypeExpect, "something different :x", gotDataConfig)
+				return
+			}
+			//-
+			PkgPathExpect := fmt.Sprintf("PkgPath: %q", expectedDataConfig.PkgPath)
+			if strings.Index(gotDataConfig, PkgPathExpect) == -1 {
+				t.Errorf("Test(%v): Expected template data configuration(%v) to contain PkgPath=%v, but got=%v\n\n%v",
+					i, e, PkgPathExpect, "something different :x", gotDataConfig)
+				return
+			}
+			//-
+			if PublicIdents := getKeyValue(templateConf, "PublicIdents"); PublicIdents == nil {
+				t.Errorf("Test(%v): Expected template configuration(%v) to contain %v key, but got=nil\n\n%v",
+					i, e, "PublicIdents", templateConfStr)
+				break
+			} else {
+				PublicIdentsStr := astNodeToString(PublicIdents)
+				// lets do static check
+				if strings.Index(PublicIdentsStr, `"Sel": "template.HTMLEscaper"`) == -1 {
+					t.Errorf("Test(%v): Expected template data configuration(%v) to contain a Public ident for html func, but it was not found\n\n%v",
+						i, e, PublicIdentsStr)
+					return
+				}
+				if strings.Index(PublicIdentsStr, `"Sel": "funcmap.BrowsePropertyPath"`) == -1 {
+					t.Errorf("Test(%v): Expected template data configuration(%v) to contain a Public ident for browsePropertyPath func, but it was not found\n\n%v",
+						i, e, PublicIdentsStr)
+					return
+				}
+				if expectedHTML {
+					if strings.Index(PublicIdentsStr, `"Sel": "template.RcdataEscaper"`) == -1 {
+						t.Errorf("Test(%v): Expected template data configuration(%v) to contain a Public ident for _html_template_rcdataescaper func, but it was not found\n\n%v",
+							i, e, PublicIdentsStr)
+						return
+					}
+				} else {
+					if strings.Index(PublicIdentsStr, `"Sel": "template.RcdataEscaper"`) > -1 {
+						t.Errorf("Test(%v): Expected template data configuration(%v) to NOT contain a Public ident for _html_template_rcdataescaper func, but it WAS found\n\n%v",
+							i, e, PublicIdentsStr)
+						return
+					}
+				}
+			}
+			//-
+			if FuncsExport := getKeyValue(templateConf, "FuncsExport"); FuncsExport == nil {
+				t.Errorf("Test(%v): Expected template configuration(%v) to contain %v key, but got=nil\n\n%v",
+					i, e, "FuncsExport", templateConfStr)
+				break
+			} else {
+				FuncsExportStr := astNodeToString(FuncsExport)
+				// lets do static check
+				if strings.Index(FuncsExportStr, `"html": func(args ...interface{}) string`) == -1 {
+					t.Errorf("Test(%v): Expected template data configuration(%v) to contain a FuncExport for html func, but it was not found\n\n%v",
+						i, e, FuncsExportStr)
+					return
+				}
+				if strings.Index(FuncsExportStr, `"browsePropertyPath": func(some interface{}, propertypath string, args ...interface{}) interface{}`) == -1 {
+					t.Errorf("Test(%v): Expected template data configuration(%v) to contain a FuncExport for browsePropertyPath func, but it was not found\n\n%v",
+						i, e, FuncsExportStr)
+					return
+				}
+				if expectedHTML {
+					if strings.Index(FuncsExportStr, `"_html_template_urlnormalizer": func(args ...interface{}) string`) == -1 {
+						t.Errorf("Test(%v): Expected template data configuration(%v) to contain a FuncExport for _html_template_urlnormalizer func, but it was not found\n\n%v",
+							i, e, FuncsExportStr)
+						return
+					}
+				} else {
+					if strings.Index(FuncsExportStr, `"_html_template_urlnormalizer": func(args ...interface{}) string`) > -1 {
+						t.Errorf("Test(%v): Expected template data configuration(%v) to NOT contain a FuncExport for _html_template_urlnormalizer func, but it WAS found\n\n%v",
+							i, e, FuncsExportStr)
+						return
+					}
+				}
+			}
 		}
 	}
-	return nil
 }

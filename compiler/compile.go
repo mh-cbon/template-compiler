@@ -1,215 +1,408 @@
 package compiler
 
 import (
-	"bytes"
 	"fmt"
-	"go/format"
-	"go/token"
+	"go/ast"
 	html "html/template"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
+	"sort"
 	"strings"
 	text "text/template"
 	"text/template/parse"
 
+	"github.com/mh-cbon/template-compiler/compiled"
 	"github.com/mh-cbon/template-tree-simplifier/simplifier"
 	"github.com/serenize/snaker"
 )
 
-// Compile convert the templates tree into go code
-// and generates the resulting go file.
-func Compile(
-	tpls []*TemplateToCompile,
-	programPkg string,
-	varName string,
-	dataPkg string,
-	dataType string,
-	dataValue interface{},
-	funcsMap map[string]interface{},
-	funcsMapPublic []map[string]string,
-) (string, error) {
-
-	knownIdents := gatherIdents(varName, tpls)
-	dataPkgIdent, dataPkgAlias := uncollidePkg(dataPkg, knownIdents)
-	dataPkg = fmt.Sprintf("%v %q", dataPkgAlias, dataPkg) // must include the alias
-	dataQualifier := fmt.Sprintf("%v.%v", dataPkgIdent, dataType)
-	if dataType[0] == []byte("*")[0] {
-		dataQualifier = fmt.Sprintf("*%v.%v", dataPkgIdent, dataType[1:])
-	}
-
-	builtinTexts := map[string]string{}
-	fnContent := ""
-	var allAdditionnalImports []string
-	for _, tpl := range tpls {
-		typeCheck := simplifier.TransformTree(tpl.tree, dataValue, funcsMap)
-
-		astTree, additionalImports := convertTplTree(
-			tpl.tree,
-			typeCheck,
-			builtinTexts,
-			dataQualifier,
-			funcsMap,
-			funcsMapPublic,
-			tpl.fnname,
-		)
-
-		allAdditionnalImports = append(allAdditionnalImports, additionalImports...)
-
-		var b bytes.Buffer
-		fset := token.NewFileSet()
-		format.Node(&b, fset, astTree)
-
-		fnContent += b.String() + "\n\n"
-	}
-	program := generateBaseProgram(programPkg, dataPkg, varName, tpls, allAdditionnalImports)
-	program += fnContent
-
-	// add the builtin text values
-	for text, name := range builtinTexts {
-		program += fmt.Sprintf("var %v = []byte(%q)\n", name, text)
-	}
-
-	// fmt.Println(program)
-
-	return program, nil
+// CompiledTemplatesProgram ...
+type CompiledTemplatesProgram struct {
+	varName      string
+	imports      []*ast.ImportSpec
+	funcs        []*ast.FuncDecl
+	idents       []string
+	builtinTexts map[string]string
 }
 
-func generateBaseProgram(
-	pkgName, dataPkg, varName string,
-	tpls []*TemplateToCompile,
-	allAdditionnalImports []string,
-) string {
-	program := fmt.Sprintf("package %v\n\n", pkgName)
-	program += fmt.Sprintf("//golint:ignore\n\n")
-	program += fmt.Sprintf("import (\n")
-	program += fmt.Sprintln(` "io"`)
-	program += fmt.Sprintln(` "github.com/mh-cbon/template-compiler/compiled"`)
-	program += fmt.Sprintln(` "github.com/mh-cbon/template-compiler/std/text/template/parse"`)
-	for _, i := range allAdditionnalImports {
-		if i != "io" &&
-			i != "github.com/mh-cbon/template-compiler/compiled" &&
-			i != "github.com/mh-cbon/template-compiler/std/text/template/parse" {
-			program += fmt.Sprintf(" %q\n", i)
-		}
+// NewCompiledTemplatesProgram ...
+func NewCompiledTemplatesProgram(varName string /*, conf *compiled.Configuration*/) *CompiledTemplatesProgram {
+	ret := &CompiledTemplatesProgram{
+		varName: varName,
+		// config:  conf,
+		idents: []string{
+			"t", "w", "data", "indata", varName,
+		},
+		builtinTexts: map[string]string{},
 	}
-	program += fmt.Sprintln(` ` + dataPkg)
-	program += fmt.Sprintf(")\n\n")
-	program += fmt.Sprintf("func init () {\n")
-	program += fmt.Sprintf("  %v = compiled.NewRegistry()\n", varName)
-	for _, t := range tpls {
-		program += fmt.Sprintf("  %v.Add(%#v, %v)\n", varName, t.name, t.fnname)
-	}
-	for i, t := range tpls {
-		for e, a := range t.definedTemplateNames {
-			varX := fmt.Sprintf("tpl%vX%v", i, e)
-			varY := fmt.Sprintf("tpl%vY%v", i, e)
-			program += fmt.Sprintf("  %v := %v.MustGet(%#v)\n", varX, varName, t.name)
-			program += fmt.Sprintf("  %v := %v.MustGet(%#v)\n", varY, varName, a)
-			program += fmt.Sprintf("  %v, _ = %v.Compiled(%v)\n", varX, varX, varY)
-			program += fmt.Sprintf("  %v.Set(%#v, %v)\n", varName, t.name, varX)
-		}
-	}
-	program += fmt.Sprintf("}\n\n")
-	return program
-}
-
-func gatherIdents(varName string, tpls []*TemplateToCompile) []string {
-	knownIdents := []string{"parse", "t", "w", "io", "data", "indata", varName}
-	for _, tpl := range tpls {
-		knownIdents = append(knownIdents, tpl.fnname)
-	}
-	return knownIdents
-}
-
-func uncollidePkg(pkgPath string, knownIdents []string) (string, string) {
-	pkgIdent := filepath.Base(pkgPath)
-	pkgAlias := ""
-	for _, ident := range knownIdents {
-		if ident == pkgIdent {
-			pkgAlias = pkgIdent + "alias"
-			break
-		}
-	}
-	if pkgAlias != "" {
-		pkgIdent = pkgAlias
-	}
-	return pkgIdent, pkgAlias
-}
-
-// PrepareTemplates parses and compiles template files.
-func PrepareTemplates(
-	tplsPath []string,
-	isHTML bool,
-	funcsMap map[string]interface{},
-) ([]*TemplateToCompile, error) {
-
-	var tpls []*TemplateToCompile
-	for _, tplPath := range tplsPath {
-		var treeNames map[string]*parse.Tree
-		var err error
-		if isHTML {
-			treeNames, err = compileHTMLTemplate(tplPath, funcsMap)
-		} else {
-			treeNames, err = compileTextTemplate(tplPath, funcsMap)
-		}
-		if err != nil {
-			return tpls, err
-		}
-		mainName := filepath.Base(tplPath)
-		tpls = append(tpls, PrepareTemplate(mainName, treeNames)...)
-	}
-	return tpls, nil
-}
-
-// PrepareTemplate ...
-func PrepareTemplate(
-	name string,
-	trees map[string]*parse.Tree,
-) []*TemplateToCompile {
-	var ret []*TemplateToCompile
-	i := 0
-	for treeName, tree := range trees {
-		tplFnname := cleanTplName("fn" + name + treeName + "_" + strconv.Itoa(i))
-		ret = append(ret, &TemplateToCompile{
-			treeName,
-			snakeToCamel(tplFnname),
-			tree,
-			[]string{},
-		})
-		i++
-	}
-	associateTemplates(name, ret)
+	ret.addImport("io")
+	ret.addImport("github.com/mh-cbon/template-compiler/std/text/template/parse")
 	return ret
 }
 
-// TemplateToCompile is a struct which can hold
-// test/template or html/template.
-// it holds
-// - fnname the resulting compiled function for a template
-// - name, the template named
-// - tree, the result of template parsing
-// - definedTemplateNames, the list of defined templates
-//    with the define instruction in a file template.
+// CompileAndWrite ...
+func (c *CompiledTemplatesProgram) CompileAndWrite(config *compiled.Configuration) error {
+	program, err := c.Compile(config)
+	if err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(config.OutPath, []byte(program), os.ModePerm); err != nil {
+		return fmt.Errorf("Failed to write the compiled templates: %v", err)
+	}
+	return nil
+}
+
+//Compile ....
+func (c *CompiledTemplatesProgram) Compile(config *compiled.Configuration) (string, error) {
+	if err := updateOutPkg(config); err != nil {
+		return "", err
+	}
+
+	templatesToCompile, err := c.getTemplatesToCompile(config)
+	if err != nil {
+		return "", err
+	}
+
+	return c.compileTemplates(config.OutPkg, templatesToCompile)
+}
+
+//compileTemplates ....
+func (c *CompiledTemplatesProgram) compileTemplates(outpkg string, templatesToCompile []*TemplateToCompile) (string, error) {
+	if err := c.convertTemplates(templatesToCompile); err != nil {
+		return "", err
+	}
+	return c.generateProgram(outpkg, templatesToCompile), nil
+}
+func (c *CompiledTemplatesProgram) convertTemplates(templatesToCompile []*TemplateToCompile) error {
+	for _, t := range templatesToCompile {
+		for _, f := range t.files {
+			for _, name := range f.names() {
+				f.tplsFunc[name] = c.makeFuncName(f.tplsFunc[name])
+				f.tplsFunc[name] = snakeToCamel(f.tplsFunc[name])
+
+				err := convertTplTree(
+					f.tplsFunc[name],
+					f.tplsTree[name],
+					t.FuncsExport,
+					t.PublicIdents,
+					t.DataConfiguration,
+					f.tplsTypeCheck[name],
+					c,
+				)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// ...
+func (c *CompiledTemplatesProgram) getTemplatesToCompile(conf *compiled.Configuration) ([]*TemplateToCompile, error) {
+	templatesToCompile := convertConfigToTemplatesToCompile(conf)
+	for _, t := range templatesToCompile {
+		if err := t.prepare(); err != nil {
+			return templatesToCompile, err
+		}
+	}
+	return templatesToCompile, nil
+}
+
+func updateOutPkg(conf *compiled.Configuration) error {
+	if conf.OutPkg == "" {
+		pkgName, err := LookupPackageName(conf.OutPath)
+		if err != nil {
+			return fmt.Errorf("Failed to lookup for the package name: %v", err)
+		}
+		conf.OutPkg = pkgName
+	}
+	return nil
+}
+
+func (c *CompiledTemplatesProgram) getDataQualifier(dataConf compiled.DataConfiguration) string {
+	dataAlias := c.addImport(dataConf.PkgPath)
+	dataQualifier := fmt.Sprintf("%v.%v", dataAlias, dataConf.DataTypeName)
+	if dataConf.IsPtr {
+		dataQualifier = fmt.Sprintf("*%v.%v", dataAlias, dataConf.DataTypeName)
+	}
+	return dataQualifier
+}
+
+func (c *CompiledTemplatesProgram) addImport(pkgpath string) string {
+	qpath := fmt.Sprintf("%q", pkgpath)
+	bpath := filepath.Base(pkgpath)
+	// if already imported, return the current alias
+	for _, i := range c.imports {
+		if i.Path.Value == qpath {
+			if i.Name == nil {
+				return bpath
+			}
+			return i.Name.Name
+		}
+	}
+	newImport := &ast.ImportSpec{
+		Path: &ast.BasicLit{Value: qpath},
+	}
+	c.imports = append(c.imports, newImport)
+	if c.isCollidingIdent(bpath) {
+		bpath = "alias" + bpath
+		newImport.Name = &ast.Ident{Name: bpath}
+	}
+	c.idents = append(c.idents, bpath)
+	return bpath
+}
+
+func (c *CompiledTemplatesProgram) isCollidingIdent(ident string) bool {
+	// check for imports
+	for _, i := range c.imports {
+		if i.Name != nil && i.Name.Name == ident {
+			return true
+		}
+	}
+	// check for static idents
+	for _, i := range c.idents {
+		if i == ident {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *CompiledTemplatesProgram) makeFuncName(baseName string) string {
+	x := baseName
+	i := 0
+	for c.isCollidingIdent(x) {
+		x = fmt.Sprintf("%v%v%v", "fn", i, baseName)
+		i++
+	}
+	c.idents = append(c.idents, x)
+	return x
+}
+
+func (c *CompiledTemplatesProgram) createFunc(name string) *ast.FuncDecl {
+	gocode := fmt.Sprintf(
+		`package aa
+func %v(t parse.Templater, w io.Writer, indata interface{}) error {}`,
+		name,
+	)
+	f := stringToAst(gocode)
+	fn := f.Decls[0].(*ast.FuncDecl)
+	c.funcs = append(c.funcs, fn)
+	return fn
+}
+
+func (c *CompiledTemplatesProgram) addBuiltintText(text string) string {
+	if x, ok := c.builtinTexts[text]; ok {
+		return x
+	}
+	c.builtinTexts[text] = fmt.Sprintf("%v%v", "builtin", len(c.builtinTexts))
+	return c.builtinTexts[text]
+}
+
+func (c *CompiledTemplatesProgram) generateInitFunc(tpls []*TemplateToCompile) string {
+	initfunc := ""
+	initfunc += fmt.Sprintf("func init () {\n")
+	for _, t := range tpls {
+		for _, f := range t.files {
+			for _, name := range f.names() {
+				funcname := f.tplsFunc[name]
+				initfunc += fmt.Sprintf("  %v.Add(%#v, %v)\n", c.varName, name, funcname)
+			}
+		}
+	}
+
+	for _, t := range tpls {
+		for i, f := range t.files {
+			for e, name := range f.definedTemplates {
+				varX := fmt.Sprintf("tpl%vX%v", i, e)
+				varY := fmt.Sprintf("tpl%vY%v", i, e)
+				initfunc += fmt.Sprintf("  %v := %v.MustGet(%#v)\n", varX, c.varName, f.name)
+				initfunc += fmt.Sprintf("  %v := %v.MustGet(%#v)\n", varY, c.varName, name)
+				initfunc += fmt.Sprintf("  %v, _ = %v.Compiled(%v)\n", varX, varX, varY)
+				initfunc += fmt.Sprintf("  %v.Set(%#v, %v)\n", c.varName, f.name, varX)
+			}
+		}
+	}
+
+	initfunc += fmt.Sprintf("}")
+	return initfunc
+}
+func (c *CompiledTemplatesProgram) generateProgram(outpkg string, tpls []*TemplateToCompile) string {
+	program := fmt.Sprintf("package %v\n\n", outpkg)
+	program += fmt.Sprintf("//golint:ignore\n\n")
+	program += fmt.Sprintf("%v\n\n", c.generateImportStmt())
+	program += fmt.Sprintf("%v\n\n", c.generateBuiltins())
+	program += fmt.Sprintf("%v\n\n", c.generateInitFunc(tpls))
+	for _, f := range c.funcs {
+		program += fmt.Sprintf("%v\n\n", astNodeToString(f))
+	}
+	return program
+}
+
+func (c *CompiledTemplatesProgram) generateImportStmt() string {
+	importStmt := ""
+	importStmt += fmt.Sprintf("import (\n")
+	for _, i := range c.imports {
+		importStmt += fmt.Sprintf("\t")
+		if i.Name != nil {
+			importStmt += fmt.Sprintf("%v ", i.Name.Name)
+		}
+		importStmt += fmt.Sprintf("%v\n", i.Path.Value)
+	}
+	importStmt += fmt.Sprintf(")")
+	return importStmt
+}
+
+func (c *CompiledTemplatesProgram) generateBuiltins() string {
+	builtins := ""
+	for text, name := range c.builtinTexts {
+		builtins += fmt.Sprintf("var %v = []byte(%q)\n", name, text)
+	}
+	return builtins
+}
+
+func convertConfigToTemplatesToCompile(conf *compiled.Configuration) []*TemplateToCompile {
+	ret := []*TemplateToCompile{}
+	for _, t := range conf.Templates {
+		ret = append(ret,
+			makeTemplateToCompileNew(t),
+		)
+	}
+	return ret
+}
+
+// TemplateToCompile ...
 type TemplateToCompile struct {
-	name                 string
-	fnname               string
-	tree                 *parse.Tree
-	definedTemplateNames []string
+	*compiled.TemplateConfiguration
+	files []TemplateFileToCompile
 }
 
-// compileTextTemplate comiles a file template as a text/template.
-func compileTextTemplate(tplPath string, funcsMap map[string]interface{}) (map[string]*parse.Tree, error) {
+// TemplateFileToCompile ...
+type TemplateFileToCompile struct {
+	name             string
+	tplsTree         map[string]*parse.Tree
+	tplsFunc         map[string]string
+	tplsTypeCheck    map[string]*simplifier.State
+	definedTemplates []string
+}
+
+func (t TemplateFileToCompile) names() []string {
+	strs := []string{}
+	for name := range t.tplsTree {
+		strs = append(strs, name)
+	}
+	sort.Strings(strs)
+	return strs
+}
+
+func makeTemplateToCompileNew(templateConf compiled.TemplateConfiguration) *TemplateToCompile {
+	ret := &TemplateToCompile{
+		TemplateConfiguration: &templateConf,
+		files: []TemplateFileToCompile{},
+	}
+	return ret
+}
+
+func (t *TemplateToCompile) prepare() error {
+	tplsPath, err := filepath.Glob(t.TemplatesPath)
+	if err != nil {
+		return fmt.Errorf("Failed to glob the templates: %v %v", t.TemplatesPath, err)
+	}
+	for _, tplPath := range tplsPath {
+		fileTpl, err := makeTemplateFileToCompileFromFile(tplPath, t.Data, t.FuncsExport, t.HTML)
+		if err != nil {
+			return err
+		}
+		t.files = append(t.files, fileTpl)
+	}
+	return nil
+}
+
+func makeTemplateFileToCompileFromFile(tplPath string, data interface{}, funcs map[string]interface{}, HTML bool) (TemplateFileToCompile, error) {
+
+	fileTpl := TemplateFileToCompile{
+		name:             filepath.Base(tplPath),
+		tplsTree:         map[string]*parse.Tree{},
+		tplsFunc:         map[string]string{},
+		tplsTypeCheck:    map[string]*simplifier.State{},
+		definedTemplates: []string{},
+	}
+
+	content, err := ioutil.ReadFile(tplPath)
+	if err != nil {
+		return fileTpl, err
+	}
+	mainName := fileTpl.name
+
+	var treeNames map[string]*parse.Tree
+	if HTML {
+		treeNames, err = compileHTMLTemplate(mainName, string(content), funcs)
+	} else {
+		treeNames, err = compileTextTemplate(mainName, string(content), funcs)
+	}
+	if err != nil {
+		return fileTpl, err
+	}
+	fileTpl.tplsTree = treeNames
+	for treeName, tree := range fileTpl.tplsTree {
+		fileTpl.tplsTypeCheck[treeName] = simplifier.TransformTree(tree, data, funcs)
+		if treeName != mainName {
+			fileTpl.tplsFunc[treeName] = cleanTplName("fn" + mainName + "_" + treeName)
+			fileTpl.definedTemplates = append(fileTpl.definedTemplates, treeName)
+		} else {
+			fileTpl.tplsFunc[treeName] = cleanTplName("fn" + mainName)
+		}
+	}
+	return fileTpl, nil
+}
+
+func makeTemplateFileToCompileFromStr(name, tplContent string, data interface{}, funcs map[string]interface{}, HTML bool) (TemplateFileToCompile, error) {
+
+	fileTpl := TemplateFileToCompile{
+		name:             name,
+		tplsTree:         map[string]*parse.Tree{},
+		tplsFunc:         map[string]string{},
+		tplsTypeCheck:    map[string]*simplifier.State{},
+		definedTemplates: []string{},
+	}
+
+	var err error
+	var treeNames map[string]*parse.Tree
+	if HTML {
+		treeNames, err = compileHTMLTemplate(name, tplContent, funcs)
+	} else {
+		treeNames, err = compileTextTemplate(name, tplContent, funcs)
+	}
+	if err != nil {
+		return fileTpl, err
+	}
+	fileTpl.tplsTree = treeNames
+	mainName := fileTpl.name
+	for treeName, tree := range fileTpl.tplsTree {
+		fileTpl.tplsTypeCheck[treeName] = simplifier.TransformTree(tree, data, funcs)
+		if treeName != mainName {
+			fileTpl.tplsFunc[treeName] = cleanTplName("fn" + mainName + "_" + treeName)
+			fileTpl.definedTemplates = append(fileTpl.definedTemplates, treeName)
+		} else {
+			fileTpl.tplsFunc[treeName] = cleanTplName("fn" + mainName)
+		}
+	}
+	return fileTpl, nil
+}
+
+// compileTextTemplate compiles a file template as a text/template.
+func compileTextTemplate(name string, content string, funcsMap map[string]interface{}) (map[string]*parse.Tree, error) {
 	ret := map[string]*parse.Tree{}
 
-	t, err := text.New("").Funcs(funcsMap).ParseFiles(tplPath)
+	t, err := text.New(name).Funcs(funcsMap).Parse(content)
 	if err != nil {
 		return ret, err
 	}
-	t.Execute(ioutil.Discard, nil) // ignore err, it is just to force parse.
 
 	for _, tpl := range t.Templates() {
+		tpl.Execute(ioutil.Discard, nil) // ignore err, it is just to force parse.
 		if tpl.Tree != nil {
 			ret[tpl.Name()] = tpl.Tree
 		}
@@ -218,17 +411,17 @@ func compileTextTemplate(tplPath string, funcsMap map[string]interface{}) (map[s
 	return ret, nil
 }
 
-// compileHTMLTemplate comiles a file template as an html/template.
-func compileHTMLTemplate(tplPath string, funcsMap map[string]interface{}) (map[string]*parse.Tree, error) {
+// compileHTMLTemplate compiles a file template as an html/template.
+func compileHTMLTemplate(name string, content string, funcsMap map[string]interface{}) (map[string]*parse.Tree, error) {
 	ret := map[string]*parse.Tree{}
 
-	t, err := html.New("").Funcs(funcsMap).ParseFiles(tplPath)
+	t, err := html.New(name).Funcs(funcsMap).Parse(content)
 	if err != nil {
 		return ret, err
 	}
-	t.Execute(ioutil.Discard, nil) // ignore err, it is just to force parse.
 
 	for _, tpl := range t.Templates() {
+		tpl.Execute(ioutil.Discard, nil) // ignore err, it is just to force parse.
 		if tpl.Tree != nil {
 			ret[tpl.Name()] = tpl.Tree
 		}
@@ -237,22 +430,7 @@ func compileHTMLTemplate(tplPath string, funcsMap map[string]interface{}) (map[s
 	return ret, nil
 }
 
-func associateTemplates(mainTemplateName string, templatesToCompile []*TemplateToCompile) {
-	var mainTemplate *TemplateToCompile
-	for _, r := range templatesToCompile {
-		if r.name == mainTemplateName {
-			mainTemplate = r
-			break
-		}
-	}
-	for _, r := range templatesToCompile {
-		if r.name != mainTemplateName {
-			mainTemplate.definedTemplateNames = append(mainTemplate.definedTemplateNames, r.name)
-		}
-	}
-}
-
-// LookupPackageName search a directory for its delcaring package.
+// LookupPackageName search a directory for its declaring package.
 func LookupPackageName(someDir string) (string, error) {
 	dir := filepath.Dir(someDir)
 	// the dir must exists
@@ -274,11 +452,15 @@ func LookupPackageName(someDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	bs := string(b)
+	return LookupPackageNameFromStr(string(b)), nil
+}
+
+// LookupPackageNameFromStr extract the declaring package from given go source string.
+func LookupPackageNameFromStr(gocode string) string {
 	// improve this. really q&d.
-	bs = bs[strings.Index(bs, "package"):]
-	bs = bs[0:strings.Index(bs, "\n")]
-	return strings.Split(bs, "package ")[1], nil
+	gocode = gocode[strings.Index(gocode, "package"):]
+	gocode = gocode[0:strings.Index(gocode, "\n")]
+	return strings.Split(gocode, "package ")[1]
 }
 
 func snakeToCamel(s string) string {

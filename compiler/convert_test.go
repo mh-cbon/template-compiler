@@ -12,8 +12,6 @@ type TestData struct {
 	tplstr string
 	// the template data
 	dataValue interface{}
-	// the data qualifier pkg.type
-	dataQualifier string
 	// the expected function result
 	expectCompiledFn string
 	// the expected list of builtins text node variables
@@ -70,11 +68,9 @@ func TestConvert(t *testing.T) {
 
 	allTestData := []TestData{
 		TestData{
-			tplstr:        `Hello!`,
-			dataValue:     TemplateData{},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `Hello!`,
+			dataValue: TemplateData{},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var writeErr error
   _, writeErr = w.Write(builtin0)
   if writeErr != nil {
@@ -84,25 +80,29 @@ func TestConvert(t *testing.T) {
 }`,
 			expectBuiltins: map[string]string{"Hello!": "builtin0"},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+			},
 		},
 		TestData{
-			tplstr:        `{{$y := "Hello!"}}`,
-			dataValue:     TemplateData{},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{$y := "Hello!"}}`,
+			dataValue: TemplateData{},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var tplY string = "Hello!"
   return nil
 }`,
 			expectBuiltins: map[string]string{},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+			},
 		},
 		TestData{
-			tplstr:        `{{$y := "Hello!"}}{{$y}}`,
-			dataValue:     TemplateData{},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{$y := "Hello!"}}{{$y}}`,
+			dataValue: TemplateData{},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var writeErr error
   var tplY string = "Hello!"
   _, writeErr = io.WriteString(w, tplY)
@@ -113,13 +113,15 @@ func TestConvert(t *testing.T) {
 }`,
 			expectBuiltins: map[string]string{},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+			},
 		},
 		TestData{
-			tplstr:        `{{if true}}true{{else}}false{{end}}`,
-			dataValue:     TemplateData{},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{if true}}true{{else}}false{{end}}`,
+			dataValue: TemplateData{},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var writeErr error
   if true {
     _, writeErr = w.Write(builtin0)
@@ -136,6 +138,10 @@ func TestConvert(t *testing.T) {
 }`,
 			expectBuiltins: map[string]string{"true": "builtin0", "false": "builtin1"},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+			},
 		},
 		TestData{
 			tplstr: `{{.SomeString}}
@@ -156,10 +162,8 @@ func TestConvert(t *testing.T) {
 {{.SomeByte}}
 {{.SomeByteSlice}}
 {{.SomeRuneSlice}}`,
-			dataValue:     TemplateData{SomeString: "Hello!"},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			dataValue: TemplateData{SomeString: "Hello!"},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -327,14 +331,18 @@ func TestConvert(t *testing.T) {
 }`,
 			expectBuiltins: map[string]string{"\n": "builtin0"},
 			funcs:          map[string]interface{}{},
-			expectImports:  []string{"strconv", "fmt"},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+				"strconv",
+				"fmt",
+			},
 		},
 		TestData{
-			tplstr:        `{{range $i, $v := .SomeByteSlice}}{{.}}{{end}}`,
-			dataValue:     TemplateData{SomeString: "Hello!"},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{range $i, $v := .SomeByteSlice}}{{.}}{{end}}`,
+			dataValue: TemplateData{SomeString: "Hello!"},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -351,17 +359,20 @@ func TestConvert(t *testing.T) {
 }`,
 			expectBuiltins: map[string]string{},
 			funcs:          map[string]interface{}{},
-			expectImports:  []string{"strconv"},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+				"strconv",
+			},
 		},
 		TestData{
 			tplstr: `{{range $i, $v := .SomeTemplateDataSlice}}
 {{range $i, $v := $v.SomeTemplateDataSlice}}
 {{end}}
 {{end}}`,
-			dataValue:     TemplateData{},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			dataValue: TemplateData{},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -389,6 +400,11 @@ func TestConvert(t *testing.T) {
 }`,
 			expectBuiltins: map[string]string{"\n": "builtin0"},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
 			tplstr: `{{range $i, $v := .SomeTemplateDataSlice}}
@@ -396,10 +412,8 @@ Hello range branch!
 {{else}}
 Hello else branch!
 {{end}}`,
-			dataValue:     TemplateData{},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			dataValue: TemplateData{},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -425,6 +439,11 @@ Hello else branch!
 				"\nHello else branch!\n":  "builtin1",
 			},
 			funcs: map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
 			tplstr: `{{with .}}
@@ -432,10 +451,8 @@ Hello with branch!
 {{else}}
 Hello without branch!
 {{end}}`,
-			dataValue:     TemplateData{},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			dataValue: TemplateData{},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -462,13 +479,16 @@ Hello without branch!
 				"\nHello without branch!\n": "builtin1",
 			},
 			funcs: map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
-			tplstr:        `{{with .}}{{.SomeString}}{{else}}{{.SomeString}}{{end}}`,
-			dataValue:     TemplateData{},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{with .}}{{.SomeString}}{{else}}{{.SomeString}}{{end}}`,
+			dataValue: TemplateData{},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -494,13 +514,16 @@ Hello without branch!
 }`,
 			expectBuiltins: map[string]string{},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
-			tplstr:        `{{if .SomeString}}{{end}}{{if .SomeString}}{{end}}`,
-			dataValue:     TemplateData{SomeString: "Hello!"},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{if .SomeString}}{{end}}{{if .SomeString}}{{end}}`,
+			dataValue: TemplateData{SomeString: "Hello!"},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -515,6 +538,11 @@ Hello without branch!
 }`,
 			expectBuiltins: map[string]string{},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
 			tplstr: `{{if .SomeString}}{{end}}
@@ -535,10 +563,8 @@ Hello without branch!
 {{if .SomeByte}}{{end}}
 {{if .SomeByteSlice}}{{end}}
 {{if .SomeRuneSlice}}{{end}}`,
-			dataValue:     TemplateData{SomeString: "Hello!"},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			dataValue: TemplateData{SomeString: "Hello!"},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -670,15 +696,18 @@ Hello without branch!
 }`,
 			expectBuiltins: map[string]string{"\n": "builtin0"},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
 			tplstr: `{{$int := 4}}
 {{$float := 4.0}}
 {{$complex := 1i}}`,
-			dataValue:     TemplateData{SomeString: "Hello!"},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			dataValue: TemplateData{SomeString: "Hello!"},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var writeErr error
   var tplInt int = 4
   _, writeErr = w.Write(builtin0)
@@ -695,13 +724,15 @@ Hello without branch!
 }`,
 			expectBuiltins: map[string]string{"\n": "builtin0"},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+			},
 		},
 		TestData{
-			tplstr:        `{{.MethodHello}}`,
-			dataValue:     TemplateData{SomeString: "Hello!"},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{.MethodHello}}`,
+			dataValue: TemplateData{SomeString: "Hello!"},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -716,13 +747,16 @@ Hello without branch!
 }`,
 			expectBuiltins: map[string]string{},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
-			tplstr:        `{{.MethodArgHello "me"}}`,
-			dataValue:     TemplateData{SomeString: "Hello!"},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{.MethodArgHello "me"}}`,
+			dataValue: TemplateData{SomeString: "Hello!"},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -737,13 +771,16 @@ Hello without branch!
 }`,
 			expectBuiltins: map[string]string{},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
-			tplstr:        `{{.MethodArgHello2 "me" "you"}}`,
-			dataValue:     TemplateData{SomeString: "Hello!"},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{.MethodArgHello2 "me" "you"}}`,
+			dataValue: TemplateData{SomeString: "Hello!"},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -758,13 +795,16 @@ Hello without branch!
 }`,
 			expectBuiltins: map[string]string{},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
-			tplstr:        `{{.MethodArgHelloMultipleReturn "me" "you"}}`,
-			dataValue:     TemplateData{SomeString: "Hello!"},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{.MethodArgHelloMultipleReturn "me" "you"}}`,
+			dataValue: TemplateData{SomeString: "Hello!"},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -782,13 +822,16 @@ Hello without branch!
 }`,
 			expectBuiltins: map[string]string{},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
-			tplstr:        `{{$x := .}}{{$x.MethodHello}}`,
-			dataValue:     TemplateData{SomeString: "Hello!"},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{$x := .}}{{$x.MethodHello}}`,
+			dataValue: TemplateData{SomeString: "Hello!"},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -804,13 +847,16 @@ Hello without branch!
 }`,
 			expectBuiltins: map[string]string{},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
-			tplstr:        `{{$x := .}}{{$x.MethodArgHello "me"}}`,
-			dataValue:     TemplateData{SomeString: "Hello!"},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{$x := .}}{{$x.MethodArgHello "me"}}`,
+			dataValue: TemplateData{SomeString: "Hello!"},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -826,13 +872,16 @@ Hello without branch!
 }`,
 			expectBuiltins: map[string]string{},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
-			tplstr:        `{{$x := .}}{{$x.MethodArgHello2 "me" "you"}}`,
-			dataValue:     TemplateData{SomeString: "Hello!"},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{$x := .}}{{$x.MethodArgHello2 "me" "you"}}`,
+			dataValue: TemplateData{SomeString: "Hello!"},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -848,13 +897,16 @@ Hello without branch!
 }`,
 			expectBuiltins: map[string]string{},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
-			tplstr:        `{{$x := .}}{{$x.MethodArgHelloMultipleReturn "me" "you"}}`,
-			dataValue:     TemplateData{SomeString: "Hello!"},
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{$x := .}}{{$x.MethodArgHelloMultipleReturn "me" "you"}}`,
+			dataValue: TemplateData{SomeString: "Hello!"},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -873,12 +925,15 @@ Hello without branch!
 }`,
 			expectBuiltins: map[string]string{},
 			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
-			tplstr:        `{{up "rr"}}`,
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr: `{{up "rr"}}`,
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var writeErr error
   var var0 string = t.GetFuncs()["up"].(func(string) string)("rr")
   _, writeErr = io.WriteString(w, var0)
@@ -893,12 +948,14 @@ Hello without branch!
 					return s
 				},
 			},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+			},
 		},
 		TestData{
-			tplstr:        `{{split "rr" "r"}}`,
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr: `{{split "rr" "r"}}`,
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var writeErr error
   var var0 string = t.GetFuncs()["split"].(func(string, string) string)("rr", "r")
   _, writeErr = io.WriteString(w, var0)
@@ -913,12 +970,14 @@ Hello without branch!
 					return s
 				},
 			},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+			},
 		},
 		TestData{
-			tplstr:        `{{fnerr "r"}}`,
-			dataQualifier: `compiler.TemplateData`,
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr: `{{fnerr "r"}}`,
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var writeErr error
   var0, err := t.GetFuncs()["fnerr"].(func(string) (string, error))("r")
   if err != nil {
@@ -936,13 +995,15 @@ Hello without branch!
 					return s, nil
 				},
 			},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+			},
 		},
 		TestData{
-			tplstr:        `{{.SomeInterface}}`,
-			dataQualifier: `compiler.TemplateData`,
-			dataValue:     TemplateData{SomeInterface: TemplateData{}},
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{.SomeInterface}}`,
+			dataValue: TemplateData{SomeInterface: TemplateData{}},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -957,14 +1018,17 @@ Hello without branch!
 }`,
 			expectBuiltins: map[string]string{},
 			funcs:          map[string]interface{}{},
-			expectImports:  []string{"fmt"},
+			expectImports: []string{
+				"io",
+				"fmt",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 		},
 		TestData{
-			tplstr:        `{{.SomeInterface.SomeInterface}}`,
-			dataQualifier: `compiler.TemplateData`,
-			dataValue:     TemplateData{SomeInterface: TemplateData{}},
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{.SomeInterface.SomeInterface}}`,
+			dataValue: TemplateData{SomeInterface: TemplateData{}},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -981,7 +1045,13 @@ Hello without branch!
 			funcs: map[string]interface{}{
 				"browsePropertyPath": func(x interface{}, p string, args ...interface{}) interface{} { return nil },
 			},
-			expectImports: []string{"github.com/mh-cbon/template-tree-simplifier/funcmap", "fmt"},
+			expectImports: []string{
+				"io",
+				"fmt",
+				"github.com/mh-cbon/template-tree-simplifier/funcmap",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 			funcsMapPublic: []map[string]string{
 				map[string]string{
 					"FuncName": "browsePropertyPath",
@@ -991,11 +1061,9 @@ Hello without branch!
 			},
 		},
 		TestData{
-			tplstr:        `{{$x := .SomeInterface}}{{$x.SomeInterface}}`,
-			dataQualifier: `compiler.TemplateData`,
-			dataValue:     TemplateData{SomeInterface: TemplateData{}},
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{$x := .SomeInterface}}{{$x.SomeInterface}}`,
+			dataValue: TemplateData{SomeInterface: TemplateData{}},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -1013,7 +1081,13 @@ Hello without branch!
 			funcs: map[string]interface{}{
 				"browsePropertyPath": func(x interface{}, p string, args ...interface{}) interface{} { return nil },
 			},
-			expectImports: []string{"github.com/mh-cbon/template-tree-simplifier/funcmap", "fmt"},
+			expectImports: []string{
+				"io",
+				"fmt",
+				"github.com/mh-cbon/template-tree-simplifier/funcmap",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 			funcsMapPublic: []map[string]string{
 				map[string]string{
 					"FuncName": "browsePropertyPath",
@@ -1023,11 +1097,9 @@ Hello without branch!
 			},
 		},
 		TestData{
-			tplstr:        `{{$x := .SomeInterface}}{{$x.MethodHello}}`,
-			dataQualifier: `compiler.TemplateData`,
-			dataValue:     TemplateData{SomeInterface: TemplateData{}},
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{$x := .SomeInterface}}{{$x.MethodHello}}`,
+			dataValue: TemplateData{SomeInterface: TemplateData{}},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -1045,7 +1117,13 @@ Hello without branch!
 			funcs: map[string]interface{}{
 				"browsePropertyPath": func(x interface{}, p string, args ...interface{}) interface{} { return nil },
 			},
-			expectImports: []string{"github.com/mh-cbon/template-tree-simplifier/funcmap", "fmt"},
+			expectImports: []string{
+				"io",
+				"fmt",
+				"github.com/mh-cbon/template-tree-simplifier/funcmap",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 			funcsMapPublic: []map[string]string{
 				map[string]string{
 					"FuncName": "browsePropertyPath",
@@ -1055,11 +1133,9 @@ Hello without branch!
 			},
 		},
 		TestData{
-			tplstr:        `{{$x := .SomeInterface}}{{$x.MethodArgHello2 "me" "you"}}`,
-			dataQualifier: `compiler.TemplateData`,
-			dataValue:     TemplateData{SomeInterface: TemplateData{}},
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{$x := .SomeInterface}}{{$x.MethodArgHello2 "me" "you"}}`,
+			dataValue: TemplateData{SomeInterface: TemplateData{}},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var data compiler.TemplateData
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
@@ -1077,7 +1153,13 @@ Hello without branch!
 			funcs: map[string]interface{}{
 				"browsePropertyPath": func(x interface{}, p string, args ...interface{}) interface{} { return nil },
 			},
-			expectImports: []string{"github.com/mh-cbon/template-tree-simplifier/funcmap", "fmt"},
+			expectImports: []string{
+				"io",
+				"fmt",
+				"github.com/mh-cbon/template-tree-simplifier/funcmap",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
 			funcsMapPublic: []map[string]string{
 				map[string]string{
 					"FuncName": "browsePropertyPath",
@@ -1087,11 +1169,9 @@ Hello without branch!
 			},
 		},
 		TestData{
-			tplstr:        `{{define "rr"}}what{{end}}ww{{template "rr" (up "rr")}}`,
-			dataQualifier: `compiler.TemplateData`,
-			dataValue:     TemplateData{SomeInterface: TemplateData{}},
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{define "rr"}}what{{end}}ww{{template "rr" (up "rr")}}`,
+			dataValue: TemplateData{SomeInterface: TemplateData{}},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var writeErr error
   _, writeErr = w.Write(builtin0)
   if writeErr != nil {
@@ -1109,13 +1189,15 @@ Hello without branch!
 				"browsePropertyPath": func(x interface{}, p string, args ...interface{}) interface{} { return nil },
 				"up":                 func(s string) string { return s },
 			},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+			},
 		},
 		TestData{
-			tplstr:        `{{html "rr"}}`,
-			dataQualifier: `compiler.TemplateData`,
-			dataValue:     TemplateData{SomeInterface: TemplateData{}},
-			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {
-}) error {
+			tplstr:    `{{html "rr"}}`,
+			dataValue: TemplateData{SomeInterface: TemplateData{}},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var writeErr error
   var var0 string = template.HTMLEscaper("rr")
   _, writeErr = io.WriteString(w, var0)
@@ -1129,7 +1211,11 @@ Hello without branch!
 				"browsePropertyPath": func(x interface{}, p string, args ...interface{}) interface{} { return nil },
 				"html":               func(s string) string { return s },
 			},
-			expectImports: []string{"text/template"},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"text/template",
+			},
 			funcsMapPublic: []map[string]string{
 				map[string]string{
 					"FuncName": "html",
@@ -1138,32 +1224,141 @@ Hello without branch!
 				},
 			},
 		},
+		TestData{
+			tplstr: `{{range $i, $v := .SomeTemplateDataSlice}}
+Hello range branch!
+{{$y := false}}
+{{else}}
+Hello else branch!
+{{$y := false}}
+{{end}}
+{{$y := true}}
+{{if $y}} if branch {{else}} else branch {{end}}
+{{with $y}}{{.}}{{else}}{{.}}{{end}}
+`,
+			dataValue: TemplateData{},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface{}) error {
+  var data compiler.TemplateData
+  if d, ok := indata.(compiler.TemplateData); ok {
+    data = d
+  }
+  var writeErr error
+  var var0 []*compiler.TemplateData = data.SomeTemplateDataSlice
+  for tplI, tplV := range var0 {
+    _, writeErr = w.Write(builtin0)
+    if writeErr != nil {
+      return writeErr
+    }
+    var tplY bool = false
+    _, writeErr = w.Write(builtin1)
+    if writeErr != nil {
+      return writeErr
+    }
+  }
+  if len(var0) == 0 {
+    _, writeErr = w.Write(builtin2)
+    if writeErr != nil {
+      return writeErr
+    }
+    var tplYShadow bool = false
+    _, writeErr = w.Write(builtin1)
+    if writeErr != nil {
+      return writeErr
+    }
+  }
+  _, writeErr = w.Write(builtin1)
+  if writeErr != nil {
+    return writeErr
+  }
+  var tplYShadow0 bool = true
+  _, writeErr = w.Write(builtin1)
+  if writeErr != nil {
+    return writeErr
+  }
+  if tplYShadow0 {
+    _, writeErr = w.Write(builtin3)
+    if writeErr != nil {
+      return writeErr
+    }
+  } else {
+    _, writeErr = w.Write(builtin4)
+    if writeErr != nil {
+      return writeErr
+    }
+  }
+  _, writeErr = w.Write(builtin1)
+  if writeErr != nil {
+    return writeErr
+  }
+  {
+    if tplYShadow0 {
+      _, writeErr = io.WriteString(w, strconv.FormatBool(tplYShadow0))
+      if writeErr != nil {
+        return writeErr
+      }
+    } else {
+      _, writeErr = io.WriteString(w, strconv.FormatBool(data))
+      if writeErr != nil {
+        return writeErr
+      }
+    }
+  }
+  _, writeErr = w.Write(builtin1)
+  if writeErr != nil {
+    return writeErr
+  }
+  return nil
+}`,
+			expectBuiltins: map[string]string{
+				"\nHello range branch!\n": "builtin0",
+				"\n": "builtin1",
+				"\nHello else branch!\n": "builtin2",
+				" if branch ":            "builtin3",
+				" else branch ":          "builtin4",
+			},
+			funcs: map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"strconv",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
+		},
 	}
 
-	for _, testData := range allTestData {
+	for i, testData := range allTestData {
+
 		// parse and compile the template file
-		builtinTexts := map[string]string{}
 		tpl, err := template.New("").Funcs(testData.funcs).Parse(testData.tplstr)
 		if err != nil {
-			panic(err)
+			t.Errorf("Test(%v): Expected to compile the template, but got an error=%v", i, err)
+			return
 		}
+
 		// convert it to go code
+		compiledProgram := NewCompiledTemplatesProgram("ee")
 		typeCheck := simplifier.TransformTree(tpl.Tree, testData.dataValue, testData.funcs)
-		astTree, additionnalImports := convertTplTree(
+		err = convertTplTree(
+			"fn0",
 			tpl.Tree,
-			typeCheck,
-			builtinTexts,
-			testData.dataQualifier,
 			testData.funcs,
 			testData.funcsMapPublic,
-			"fn0",
+			makeDataConfiguration(testData.dataValue),
+			typeCheck,
+			compiledProgram,
 		)
+		if err != nil {
+			t.Errorf("Test(%v): Expected to succeed, but got an error=%v", i, err)
+			return
+		}
 
-		compiledFn := astNodeToString(astTree)
+		// ensure the compiled function matches
+		astFunc := compiledProgram.funcs[0]
+
+		compiledFn := astNodeToString(astFunc)
 		compiledFn = formatGoCode(compiledFn)
 		testData.expectCompiledFn = formatGoCode(testData.expectCompiledFn)
 
-		// ensure the compiled function matches
 		if compiledFn != testData.expectCompiledFn {
 			t.Errorf(
 				"Unexpected compiled function. Expected=\n%v\n-----\nGot=\n%v\nTEMPLATE:\n%v\nSIMPLIFIED TEMPLATE:\n%v\n",
@@ -1174,7 +1369,9 @@ Hello without branch!
 			)
 			return
 		}
-		// ensure builtins text node are trasnformed into builtin variables
+
+		// ensure builtins text node are transformed into builtin variables
+		builtinTexts := compiledProgram.builtinTexts
 		for text, varname := range builtinTexts {
 			if expectVarName, ok := testData.expectBuiltins[text]; ok == false {
 				t.Errorf(
@@ -1205,19 +1402,22 @@ Hello without branch!
 				return
 			}
 		}
+
 		// ensure the import list matches
-		if len(testData.expectImports) != len(additionnalImports) {
+		gotImports := convertImportsSpecs(compiledProgram.imports)
+		expectedImports := testData.expectImports
+		if len(expectedImports) != len(gotImports) {
 			t.Errorf(
 				"Unexpected additionnal imports. Expected=\n%v\n-----\nGot=\n%v\nTEMPLATE:\n%v\nSIMPLIFIED TEMPLATE:\n%v\n",
-				len(testData.expectImports),
-				len(additionnalImports),
+				expectedImports,
+				gotImports,
 				testData.tplstr,
 				tpl.Tree.Root.String(),
 			)
 			return
 		}
-		for _, i := range testData.expectImports {
-			if strExists(i, additionnalImports) == false {
+		for _, i := range expectedImports {
+			if strExists(i, gotImports) == false {
 				t.Errorf(
 					"Missing additionnal imports. Missing=%v\nTEMPLATE:\n%v\nSIMPLIFIED TEMPLATE:\n%v\n",
 					i,
@@ -1227,8 +1427,8 @@ Hello without branch!
 				return
 			}
 		}
-		for _, i := range additionnalImports {
-			if strExists(i, testData.expectImports) == false {
+		for _, i := range gotImports {
+			if strExists(i, expectedImports) == false {
 				t.Errorf(
 					"Unexpected additionnal imports. Unwanted=%v\nTEMPLATE:\n%v\nSIMPLIFIED TEMPLATE:\n%v\n",
 					i,

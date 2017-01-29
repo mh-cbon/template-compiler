@@ -7,23 +7,24 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"text/template/parse"
 
+	"github.com/mh-cbon/template-compiler/compiled"
 	"github.com/mh-cbon/template-tree-simplifier/simplifier"
 )
 
 type converter struct {
-	tree              *parse.Tree
-	funcs             map[string]interface{}
-	funcsMapPublic    []map[string]string
-	writerName        string
-	builtinTexts      map[string]string
-	fn                *ast.FuncDecl
-	state             *state
-	errvars           int
-	additionalImports []string
+	tree            *parse.Tree
+	writerName      string
+	fn              *ast.FuncDecl
+	state           *state
+	errvars         int
+	compiledProgram *CompiledTemplatesProgram
+	funcsMap        map[string]interface{}
+	publicIdents    []map[string]string
 }
 
 func (c *converter) createErrVars() string {
@@ -35,10 +36,12 @@ func (c *converter) createErrVars() string {
 }
 
 type state struct {
-	current *scope
+	typeCheck *simplifier.State
+	current   *scope
 }
 type scope struct {
 	dotVars []string
+	node    ast.Node
 	body    *ast.BlockStmt
 	parent  *scope
 }
@@ -47,16 +50,16 @@ func (s *state) addNode(n ast.Stmt) {
 	s.current.body.List = append(s.current.body.List, n)
 }
 
-func (s *state) enter(n *ast.BlockStmt, currentDotVar string) {
-	if n == nil {
-		err := fmt.Errorf("state.enter: Impossible to enter a nil BlockStmt")
+func (s *state) enter(body *ast.BlockStmt, currentDotVar string) {
+	if body == nil {
+		err := fmt.Errorf("state.enter: Impossible to enter a nil ast.Node")
 		panic(err)
 	}
-	s.current = &scope{[]string{currentDotVar}, n, s.current}
-}
-
-func (s *state) dotVar() string {
-	return s.current.dotVars[len(s.current.dotVars)-1]
+	s.current = &scope{
+		dotVars: []string{currentDotVar},
+		body:    body,
+		parent:  s.current,
+	}
 }
 
 func (s *state) leave() {
@@ -65,63 +68,51 @@ func (s *state) leave() {
 	}
 }
 
-func convertTplTree(
-	tree *parse.Tree,
-	typeCheck *simplifier.State,
-	builtinTexts map[string]string,
-	dataQualifier string,
-	funcs map[string]interface{},
-	funcsMapPublic []map[string]string,
-	fnName string,
-) (*ast.FuncDecl, []string) {
-	c := converter{tree, funcs, funcsMapPublic, "w", builtinTexts, nil, nil, -1, []string{}}
-	c.fn = makeFunc(fnName)
+func (s *state) dotVar() string {
+	return s.current.dotVars[len(s.current.dotVars)-1]
+}
 
-	if simplifier.IsUsingDot(tree) {
+func convertTplTree(
+	fnname string,
+	tree *parse.Tree,
+	funcsMap map[string]interface{},
+	publicIdents []map[string]string,
+	dataConfiguration compiled.DataConfiguration,
+	typeCheck *simplifier.State,
+	compiledProgram *CompiledTemplatesProgram,
+) error {
+	c := converter{
+		tree:            tree,
+		writerName:      "w",
+		state:           &state{typeCheck: typeCheck},
+		errvars:         -1,
+		compiledProgram: compiledProgram,
+		funcsMap:        funcsMap,
+		publicIdents:    publicIdents,
+	}
+
+	c.fn = c.compiledProgram.createFunc(fnname)
+
+	if simplifier.IsUsingDot(c.tree) {
+		dataQualifier := compiledProgram.getDataQualifier(dataConfiguration)
 		c.fn.Body.List = append(c.fn.Body.List, makePrelude(dataQualifier)...)
 	}
-	if simplifier.PrintsAnything(tree) {
-		c.fn.Body.List = append(c.fn.Body.List, makeWriteErrorDecl()...)
+	if simplifier.PrintsAnything(c.tree) {
+		c.fn.Body.List = append(c.fn.Body.List, makeWriteErrorDecl())
 	}
 
-	c.state = &state{}
-	c.state.enter(c.fn.Body, "data")
 	typeCheck.Enter()
-	c.convert(tree.Root, typeCheck)
-	typeCheck.Leave()
+	c.state.enter(c.fn.Body, "data")
+	c.convert(c.tree.Root, typeCheck)
 	c.state.leave()
+	typeCheck.Leave()
 	injectReturnNil(c.fn)
-	return c.fn, c.additionalImports
+	return nil // todo: get errors from sub calls and forward higher.
 }
 
-func makeFunc(fnName string) *ast.FuncDecl {
-	fn := &ast.FuncDecl{Name: &ast.Ident{Name: fnName}}
-	fn.Type = &ast.FuncType{}
-
-	fn.Type.Params = &ast.FieldList{}
-	fn.Type.Params.List = make([]*ast.Field, 0)
-
-	names := []*ast.Ident{&ast.Ident{Name: "t"}}
-	typee := &ast.SelectorExpr{X: &ast.Ident{Name: "parse"}, Sel: &ast.Ident{Name: "Templater"}}
-	fn.Type.Params.List = append(fn.Type.Params.List, &ast.Field{Names: names, Type: typee})
-
-	names = []*ast.Ident{&ast.Ident{Name: "w"}}
-	typee = &ast.SelectorExpr{X: &ast.Ident{Name: "io"}, Sel: &ast.Ident{Name: "Writer"}}
-	fn.Type.Params.List = append(fn.Type.Params.List, &ast.Field{Names: names, Type: typee})
-
-	names = []*ast.Ident{&ast.Ident{Name: "indata"}}
-	intf := &ast.InterfaceType{Methods: &ast.FieldList{}}
-	fn.Type.Params.List = append(fn.Type.Params.List, &ast.Field{Names: names, Type: intf})
-
-	fn.Type.Results = &ast.FieldList{}
-	fn.Type.Results.List = make([]*ast.Field, 0)
-
-	fn.Type.Results.List = append(fn.Type.Results.List, &ast.Field{Type: &ast.Ident{Name: "error"}})
-
-	fn.Body = &ast.BlockStmt{}
-	return fn
-}
-
+// convert browses the template nodes,
+// convert them to ast nodes,
+// add them to the current BlockStmt.
 func (c *converter) convert(node interface{}, typeCheck *simplifier.State) {
 	switch node := node.(type) {
 
@@ -150,6 +141,7 @@ func (c *converter) convert(node interface{}, typeCheck *simplifier.State) {
 			c.convert(n, typeCheck)
 		}
 		c.state.leave()
+
 		if ifStmt.Else != nil {
 			elseStmt := ifStmt.Else.(*ast.BlockStmt)
 			c.state.enter(elseStmt, c.state.dotVar())
@@ -162,15 +154,14 @@ func (c *converter) convert(node interface{}, typeCheck *simplifier.State) {
 	case *parse.RangeNode:
 		rangeStmt, dotVarName := c.handleRangeNode(node, typeCheck)
 		c.state.addNode(rangeStmt)
-		c.state.enter(rangeStmt.Body, dotVarName)
 		typeCheck.Enter()
+		c.state.enter(rangeStmt.Body, dotVarName)
 		for _, n := range node.List.Nodes {
 			c.convert(n, typeCheck)
 		}
 		c.state.leave()
-		typeCheck.Leave()
+
 		if node.ElseList != nil {
-			typeCheck.Enter()
 			elseStmt := c.handleRangeElseNode(node, typeCheck)
 			c.state.addNode(elseStmt)
 			c.state.enter(elseStmt.Body, c.state.dotVar())
@@ -178,8 +169,8 @@ func (c *converter) convert(node interface{}, typeCheck *simplifier.State) {
 				c.convert(n, typeCheck)
 			}
 			c.state.leave()
-			typeCheck.Leave()
 		}
+		typeCheck.Leave()
 
 	case *parse.WithNode:
 		// pretty much the same as ifStmt,
@@ -194,18 +185,17 @@ func (c *converter) convert(node interface{}, typeCheck *simplifier.State) {
 		for _, n := range node.List.Nodes {
 			c.convert(n, typeCheck)
 		}
-		typeCheck.Leave()
 		c.state.leave()
+
 		if ifStmt.Else != nil {
-			typeCheck.Enter()
 			elseStmt := ifStmt.Else.(*ast.BlockStmt)
 			c.state.enter(elseStmt, c.state.dotVar())
 			for _, n := range node.ElseList.Nodes {
 				c.convert(n, typeCheck)
 			}
-			typeCheck.Leave()
 			c.state.leave()
 		}
+		typeCheck.Leave()
 
 	case *parse.TemplateNode:
 		for _, stmt := range c.handleTemplateNode(node, typeCheck) {
@@ -219,35 +209,16 @@ func (c *converter) convert(node interface{}, typeCheck *simplifier.State) {
 }
 
 func injectReturnNil(fn *ast.FuncDecl) {
-	strFunc := `func ww ()error{return nil}`
-	n := getReturnFuncAst(strFunc)
+	n := getStmtsAst(`return nil`)[0]
 	fn.Body.List = append(fn.Body.List, n)
 }
-func getReturnFuncAst(strFunc string) ast.Stmt {
-	gocode := `package aa
-` + strFunc
-	f := stringToAst(gocode)
-	return f.Decls[0].(*ast.FuncDecl).Body.List[0]
-}
+
 func embedInBlockStmt(s ast.Stmt) *ast.BlockStmt {
 	return &ast.BlockStmt{List: []ast.Stmt{s}}
 }
-func (c *converter) addImport(i string) {
-	for _, im := range c.additionalImports {
-		if im == i {
-			return
-		}
-	}
-	c.additionalImports = append(c.additionalImports, i)
-}
+
 func (c *converter) handleTextNode(node *parse.TextNode) []ast.Stmt {
-	var builtinName string
-	if b, ok := c.builtinTexts[string(node.Text)]; ok {
-		builtinName = b
-	} else {
-		builtinName = fmt.Sprintf("%v%v", "builtin", len(c.builtinTexts))
-		c.builtinTexts[string(node.Text)] = builtinName
-	}
+	builtinName := c.compiledProgram.addBuiltintText(string(node.Text))
 	return c.makeIoWrite(builtinName, reflect.TypeOf([]byte{}))
 }
 func (c *converter) handleActionNode(node *parse.ActionNode, typeCheck *simplifier.State) []ast.Stmt {
@@ -256,16 +227,16 @@ func (c *converter) handleActionNode(node *parse.ActionNode, typeCheck *simplifi
 		t, _ := c.getTypesOfCommandNode(node.Pipe.Cmds[0], typeCheck)
 
 		expr := c.handleCommandNode(node.Pipe.Cmds[0], typeCheck)
-		ret = c.makeIoWrite(astNodeToString(expr), t[0])
+		ret = c.makeIoWrite(astNodeToString(expr), t)
 
 	} else if len(node.Pipe.Cmds) == 1 { // likely a simple assignment $z := 4
 		// this case could go into the next one, it would produce an assignement (:=)
-		// but this case is designed spcifically to produce var declaration with their type.
+		// but this case is designed spcifically to produce var declaration with its type.
 		expr := c.handleCommandNode(node.Pipe.Cmds[0], typeCheck)
 		exprType, outTypes := c.getTypesOfCommandNode(node.Pipe.Cmds[0], typeCheck)
 		if len(outTypes) > 0 {
 			// the method return more than 1 parameters,
-			// the declaration switch to an assignment
+			// the declaration must switch to an assignment
 			// x, err := call(...)
 			// It is assumed that the second return parameter
 			// is an err of type error.
@@ -281,15 +252,10 @@ func (c *converter) handleActionNode(node *parse.ActionNode, typeCheck *simplifi
 			ret = append(ret, assign)
 
 			// Add the error check
-			gocode := `package aa
-        func zz (indata interface{}) {
-          if ` + errVar + ` != nil {
-            return ` + errVar + `
-          }
-        }`
-			f := stringToAst(gocode)
-			// locate the if...
-			ifErr := f.Decls[0].(*ast.FuncDecl).Body.List[0]
+			ifErr := getStmtsAst(`
+if ` + errVar + ` != nil {
+  return ` + errVar + `
+}`)[0]
 			ret = append(ret, ifErr)
 
 		} else {
@@ -297,7 +263,7 @@ func (c *converter) handleActionNode(node *parse.ActionNode, typeCheck *simplifi
 			// var x string = ""
 			vspec := &ast.ValueSpec{
 				Names:  []*ast.Ident{c.convertVariableNode(node.Pipe.Decl[0], typeCheck).(*ast.Ident)},
-				Type:   &ast.Ident{Name: exprType[0].String()},
+				Type:   &ast.Ident{Name: exprType.String()},
 				Values: []ast.Expr{expr},
 			}
 			decl := &ast.GenDecl{Tok: token.VAR, Specs: []ast.Spec{vspec}}
@@ -336,7 +302,7 @@ func (c *converter) handleIfNode(node *parse.IfNode, typeCheck *simplifier.State
 	}
 	exprToTest := c.handleCommandNode(node.Pipe.Cmds[0], typeCheck)
 	typeToTest, _ := c.getTypesOfCommandNode(node.Pipe.Cmds[0], typeCheck)
-	ifStmt.Cond = c.makeBinaryTest(exprToTest, typeToTest[0])
+	ifStmt.Cond = c.makeBinaryTest(exprToTest, typeToTest)
 	if node.ElseList != nil && len(node.ElseList.Nodes) > 0 {
 		ifStmt.Else = &ast.BlockStmt{}
 	}
@@ -364,15 +330,12 @@ func (c *converter) handleTemplateNode(node *parse.TemplateNode, typeCheck *simp
 		expr = astNodeToString(exprStmt)
 		expr = ", " + expr
 	}
-	gocode := `package aa
-	func x() {
-    writeErr = t.ExecuteTemplate(` + c.writerName + `, "` + node.Name + `"` + expr + `)
-    if writeErr != nil {
-      return writeErr
-    }
-  }`
-	f := stringToAst(gocode)
-	return f.Decls[0].(*ast.FuncDecl).Body.List
+
+	return getStmtsAst(`
+writeErr = t.ExecuteTemplate(` + c.writerName + `, "` + node.Name + `"` + expr + `)
+if writeErr != nil {
+  return writeErr
+}`)
 }
 func (c *converter) handleRangeNode(node *parse.RangeNode, typeCheck *simplifier.State) (*ast.RangeStmt, string) {
 	var dotVarName string
@@ -397,15 +360,10 @@ func (c *converter) handleRangeNode(node *parse.RangeNode, typeCheck *simplifier
 }
 func (c *converter) handleRangeElseNode(node *parse.RangeNode, typeCheck *simplifier.State) *ast.IfStmt {
 
-	gocode := `package aa
-  func zz (indata interface{}) {
-    if len(x)==0 {}
-  }`
-	f := stringToAst(gocode)
-	//c.convertNode(node.BranchNode.Pipe.Cmds[0].Args[0])
+	f := getStmtsAst(`if len(x)==0 {}`)[0]
 
 	// locate the if
-	ifStmt := f.Decls[0].(*ast.FuncDecl).Body.List[0].(*ast.IfStmt)
+	ifStmt := f.(*ast.IfStmt)
 	// locate the call to len()
 	lenCall := ifStmt.Cond.(*ast.BinaryExpr).X.(*ast.CallExpr)
 	// replace variable x with the correct ident
@@ -445,7 +403,7 @@ func (c *converter) handleWithNode(node *parse.WithNode, typeCheck *simplifier.S
 		dotVarName = node.Pipe.Cmds[0].Args[0].(*parse.VariableNode).Ident[0][1:] // must be a var.
 		expr := c.handleCommandNode(node.Pipe.Cmds[0], typeCheck)
 		typeToTest, _ := c.getTypesOfCommandNode(node.Pipe.Cmds[0], typeCheck)
-		ifStmt.Cond = c.makeBinaryTest(expr, typeToTest[0])
+		ifStmt.Cond = c.makeBinaryTest(expr, typeToTest)
 
 	}
 	if node.ElseList != nil && len(node.ElseList.Nodes) > 0 {
@@ -464,21 +422,32 @@ func (c *converter) handleCommandNode(node *parse.CommandNode, typeCheck *simpli
 			panic(err)
 		}
 		ret = e
+
 	} else {
 		var fnCall *ast.CallExpr
+
 		switch x := node.Args[0].(type) {
+		// todo: add some special treatments for identifierNodes.
+		// example, if it calls for html.HTMLEscape against a string,
+		// trasnform it into an html.HTMLEscapeString.
+		// if it s a eq (bool, bool), transforms it to bool==bool,
+		// etc etc. quiet important.
 		case *parse.IdentifierNode:
 			fnCall = c.convertIdentifierNode(x).(*ast.ExprStmt).X.(*ast.CallExpr)
+
 		case *parse.FieldNode:
 			fnCall = c.convertFieldNodeMethod(x, typeCheck).(*ast.CallExpr)
+
 		case *parse.VariableNode:
 			fnCall = c.convertVariableNode(x, typeCheck).(*ast.CallExpr)
+
 		default:
 			err := fmt.Errorf(
 				"converter.handleCommandNode: Unhandled node type\n%v\n%#v",
 				node, node)
 			panic(err)
 		}
+
 		for i, a := range node.Args[1:] {
 			e := c.convertNode(a, typeCheck)
 			if e == nil {
@@ -489,12 +458,18 @@ func (c *converter) handleCommandNode(node *parse.CommandNode, typeCheck *simpli
 			}
 			fnCall.Args = append(fnCall.Args, e)
 		}
+
 		ret = fnCall
 	}
 	return ret
 }
-func (c *converter) getTypesOfCommandNode(node *parse.CommandNode, typeCheck *simplifier.State) ([]reflect.Type, []reflect.Type) {
-	ret := []reflect.Type{}
+
+// Identify and returns the value type of the command node.
+// If the command node matches a func/method call,
+// the first output value type is available in ret,
+// all others output values goes into out[].
+func (c *converter) getTypesOfCommandNode(node *parse.CommandNode, typeCheck *simplifier.State) (reflect.Type, []reflect.Type) {
+	var ret reflect.Type
 	out := []reflect.Type{}
 	switch x := node.Args[0].(type) {
 	case *parse.FieldNode:
@@ -504,14 +479,13 @@ func (c *converter) getTypesOfCommandNode(node *parse.CommandNode, typeCheck *si
 			methType := typeCheck.ReflectPath(x.Ident, y)
 			for i := 0; i < methType.NumOut(); i++ {
 				if i == 0 {
-					ret = append(ret, methType.Out(i))
+					ret = methType.Out(i)
 				} else {
 					out = append(out, methType.Out(i))
 				}
 			}
 		} else {
-			rType := typeCheck.BrowsePathType(x.Ident, y)
-			ret = append(ret, rType)
+			ret = typeCheck.BrowsePathType(x.Ident, y)
 		}
 
 	case *parse.VariableNode:
@@ -521,7 +495,7 @@ func (c *converter) getTypesOfCommandNode(node *parse.CommandNode, typeCheck *si
 			methType := typeCheck.ReflectPath(x.Ident[1:], y)
 			for i := 0; i < methType.NumOut(); i++ {
 				if i == 0 {
-					ret = append(ret, methType.Out(i))
+					ret = methType.Out(i)
 				} else {
 					out = append(out, methType.Out(i))
 				}
@@ -530,37 +504,37 @@ func (c *converter) getTypesOfCommandNode(node *parse.CommandNode, typeCheck *si
 			if len(x.Ident) > 1 {
 				y = typeCheck.BrowsePathType(x.Ident[1:], y)
 			}
-			ret = append(ret, y)
+			ret = y
 		}
 
 	case *parse.NumberNode:
 		if x.IsFloat && !isHexConstant(x.Text) && strings.ContainsAny(x.Text, ".eE") {
-			ret = append(ret, reflect.TypeOf(1.0))
+			ret = reflect.TypeOf(1.0)
 		} else if x.IsComplex {
-			ret = append(ret, reflect.TypeOf(1i))
+			ret = reflect.TypeOf(1i)
 		} else {
-			ret = append(ret, reflect.TypeOf(1))
+			ret = reflect.TypeOf(1)
 		}
 
 	case *parse.StringNode:
-		ret = append(ret, reflect.TypeOf(""))
+		ret = reflect.TypeOf("")
 
 	case *parse.DotNode:
-		ret = append(ret, typeCheck.Dot())
+		ret = typeCheck.Dot()
 
 	case *parse.BoolNode:
-		ret = append(ret, reflect.TypeOf(x.True))
+		ret = reflect.TypeOf(x.True)
 
 	case *parse.IdentifierNode:
-		fn := c.funcs[x.Ident]
-		fnType := reflect.TypeOf(fn)
-		for i := 0; i < fnType.NumOut(); i++ {
-			if i == 0 {
-				ret = append(ret, fnType.Out(i))
-			} else {
-				out = append(out, fnType.Out(i))
-			}
+		types, found := c.getFuncOutTypes(x.Ident)
+		if found == false {
+			err := fmt.Errorf(
+				"converter.getTypesOfCommandNode: Func not found\n%v",
+				x.Ident)
+			panic(err)
 		}
+		ret = types[0]
+		out = append(out, types[1:]...)
 
 	default:
 		err := fmt.Errorf(
@@ -570,6 +544,34 @@ func (c *converter) getTypesOfCommandNode(node *parse.CommandNode, typeCheck *si
 	}
 	return ret, out
 }
+func (c *converter) getFunc(name string) (interface{}, bool) {
+	if x, ok := c.funcsMap[name]; ok {
+		return x, ok
+	}
+	return nil, false
+}
+func (c *converter) getFuncOutTypes(name string) ([]reflect.Type, bool) {
+	var ret []reflect.Type
+	if x, ok := c.getFunc(name); ok {
+		fnType := reflect.TypeOf(x)
+		for i := 0; i < fnType.NumOut(); i++ {
+			ret = append(ret, fnType.Out(i))
+		}
+		return ret, ok
+	}
+	return ret, false
+}
+func (c *converter) getFuncInTypes(name string) ([]reflect.Type, bool) {
+	var ret []reflect.Type
+	if x, ok := c.getFunc(name); ok {
+		fnType := reflect.TypeOf(x)
+		for i := 0; i < fnType.NumIn(); i++ {
+			ret = append(ret, fnType.In(i))
+		}
+		return ret, ok
+	}
+	return ret, false
+}
 
 // copied from template/exec.go?#L478
 func isHexConstant(s string) bool {
@@ -577,48 +579,52 @@ func isHexConstant(s string) bool {
 }
 
 // copied from template/exec.go?#L478
+
+// creates a binary expression such as a == b, for example.
 func (c *converter) makeBinaryTest(expr ast.Expr, exprType reflect.Type) ast.Expr {
-	// returns a binary expr, except for a struct which is always true (turns into an ast.Ident)
 	ret := &ast.BinaryExpr{X: expr}
 	switch exprType.Kind() {
 	case reflect.String:
 		ret.Op = token.NEQ
 		ret.Y = &ast.BasicLit{Kind: token.STRING, Value: `""`}
+
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		ret.Op = token.NEQ
 		ret.Y = &ast.BasicLit{Kind: token.INT, Value: `0`}
+
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		ret.Op = token.NEQ
 		ret.Y = &ast.BasicLit{Kind: token.INT, Value: `0`}
+
 	case reflect.Float32, reflect.Float64:
 		ret.Op = token.NEQ
 		ret.Y = &ast.BasicLit{Kind: token.INT, Value: `0`}
+
 	case reflect.Bool:
 		// a bool expr, return it as is
 		return expr
+
 	case reflect.Struct:
 		// a struct is always true
 		// https://golang.org/src/text/template/exec.go#L299
 		return &ast.Ident{Name: "true"}
+
 	case reflect.Array, reflect.Map, reflect.Slice /*, reflect.String*/ :
 		// truth = val.Len() > 0
-		gocode := `package aa
-      func zz (indata interface{}) {
-        len(x)
-      }`
-		f := stringToAst(gocode)
-		// locate the len()
-		lenCall := f.Decls[0].(*ast.FuncDecl).Body.List[0].(*ast.ExprStmt).X.(*ast.CallExpr)
+		f := getStmtsAst(`len(x)`)[0]
+		lenCall := f.(*ast.ExprStmt).X.(*ast.CallExpr)
 		// replace variable x with the correct ident
 		lenCall.Args[0] = expr
 		ret.X = lenCall
 		ret.Op = token.GTR
 		ret.Y = &ast.BasicLit{Kind: token.INT, Value: `0`}
+
 	default:
 		err := fmt.Errorf(
 			"converter.makeBinaryTest: Unhandled expression relfect.type\n%v\n%#v",
 			exprType, exprType.Kind())
 		panic(err)
+
 	}
 	return ret
 }
@@ -627,16 +633,23 @@ func (c *converter) convertNode(node parse.Node, typeCheck *simplifier.State) as
 	switch x := node.(type) {
 	case *parse.FieldNode:
 		ret = c.convertFieldNode(x, typeCheck)
+
 	case *parse.VariableNode:
 		ret = c.convertVariableNode(x, typeCheck)
+
 	case *parse.NumberNode:
 		ret = c.convertNumberNode(x)
+
 	case *parse.StringNode:
 		ret = c.convertStringNode(x)
+
 	case *parse.BoolNode:
 		ret = c.convertBoolNode(x)
+
 	case *parse.DotNode:
-		ret = c.convertVariableNode(&parse.VariableNode{Ident: []string{"$" + c.state.dotVar()}}, typeCheck)
+		fakeTempVar := &parse.VariableNode{Ident: []string{"$" + c.state.dotVar()}}
+		ret = c.convertVariableNode(fakeTempVar, typeCheck)
+
 	default:
 		err := fmt.Errorf(
 			"converter.convertNode: Unhandled node type\n%v\n%#v",
@@ -646,13 +659,13 @@ func (c *converter) convertNode(node parse.Node, typeCheck *simplifier.State) as
 	return ret
 }
 
-// returns the selector such template JSEscaper
-// and populates c.additionalImports
+// returns the selector such as template.JSEscaper of a funcmap call
 func (c *converter) identifierToPublicCall(name string) string {
-	for _, i := range c.funcsMapPublic {
+	for _, i := range c.publicIdents {
 		if i["FuncName"] == name {
-			c.addImport(i["Pkg"])
-			return i["Sel"]
+			f := filepath.Base(i["Pkg"])
+			alias := c.compiledProgram.addImport(i["Pkg"])
+			return strings.Replace(i["Sel"], f+".", alias+".", -1)
 		}
 	}
 	return ""
@@ -661,65 +674,51 @@ func (c *converter) convertIdentifierNode(node *parse.IdentifierNode) ast.Stmt {
 	// maybe this func can be called directly as pkg.func
 	p := c.identifierToPublicCall(node.Ident)
 	if len(p) > 0 {
-		gocode := `package aa
-  func x() {` + p + `()}`
-		f := stringToAst(gocode)
-		return f.Decls[0].(*ast.FuncDecl).Body.List[0]
+		return getStmtsAst(`` + p + `()`)[0]
 	}
-	// It s func to consume from the runtime funcmap
-	fn, ok := c.funcs[node.Ident]
-	if ok == false {
-		panic(fmt.Errorf("convert.convertIdentifierNode: func map not found %v", node.Ident))
-	} else {
 
+	// It s a func to consume from the runtime funcmap
+	x, found := c.getFunc(node.Ident)
+	if found == false {
+		err := fmt.Errorf(
+			"converter.convertIdentifierNode: Func not found\n%v",
+			node.Ident)
+		panic(err)
 	}
+	fnReflect := reflect.TypeOf(x)
+	outs, _ := c.getFuncOutTypes(node.Ident)
+	ins, _ := c.getFuncInTypes(node.Ident)
+
 	// two cases now,
 	// This func can be inlined into,
-	// template.GetFuncs()[ident].(func (...)...)(...)
+	// template.GetFuncs()[ident].(func (...params)...returns)(...args)
 	// or it can t,
 	// let s panic for now.
-	rFn := reflect.TypeOf(fn)
 	in := ""
-	for i := 0; i < rFn.NumIn(); i++ {
-		t := rFn.In(i)
-		switch t.Kind() {
-		case reflect.Struct:
-			if ast.IsExported(t.String()) == false {
-				panic(fmt.Errorf("convert.convertIdentifierNode: Impossible to use non exported in parameter of type %v in funcmap %v",
-					t.String(),
-					node.Ident,
-				))
-			}
-		case reflect.Ptr:
-			if ast.IsExported(t.Elem().String()) == false {
-				panic(fmt.Errorf("convert.convertIdentifierNode: Impossible to use non exported in parameter of type %v in funcmap %v",
-					t.String(),
-					node.Ident,
-				))
-			}
+	if unexported, ok := mustBeExportedTypes(ins); ok == false {
+		panic(fmt.Errorf(
+			"convert.convertIdentifierNode: Impossible to use non exported in parameter of type %v in funcmap %v",
+			unexported.String(),
+			node.Ident,
+		))
+	}
+	for e, i := range ins {
+		if fnReflect.IsVariadic() && e == len(ins)-1 {
+			in += "..." + i.Elem().String() + ","
+		} else {
+			in += i.String() + ","
 		}
-		in += t.String() + ","
 	}
 	out := ""
-	for i := 0; i < rFn.NumOut(); i++ {
-		t := rFn.Out(i)
-		switch t.Kind() {
-		case reflect.Struct:
-			if ast.IsExported(t.String()) == false {
-				panic(fmt.Errorf("convert.convertIdentifierNode: Impossible to use non exported in parameter of type %v in funcmap %v",
-					t.String(),
-					node.Ident,
-				))
-			}
-		case reflect.Ptr:
-			if ast.IsExported(t.Elem().String()) == false {
-				panic(fmt.Errorf("convert.convertIdentifierNode: Impossible to use non exported in parameter of type %v in funcmap %v",
-					t.String(),
-					node.Ident,
-				))
-			}
-		}
-		out += t.String() + ","
+	if unexported, ok := mustBeExportedTypes(outs); ok == false {
+		panic(fmt.Errorf(
+			"convert.convertIdentifierNode: Impossible to use non exported in parameter of type %v in funcmap %v",
+			unexported.String(),
+			node.Ident,
+		))
+	}
+	for _, o := range outs {
+		out += o.String() + ","
 	}
 
 	if len(in) > 0 {
@@ -729,30 +728,27 @@ func (c *converter) convertIdentifierNode(node *parse.IdentifierNode) ast.Stmt {
 		out = out[0 : len(out)-1]
 	}
 
-	gocode := `package aa
-func x() {t.GetFuncs()["` + node.Ident + `"].(func (` + in + `) (` + out + `))()}`
-	f := stringToAst(gocode)
-	return f.Decls[0].(*ast.FuncDecl).Body.List[0]
+	return getStmtsAst(
+		`t.GetFuncs()["` + node.Ident + `"].(func (` + in + `) (` + out + `))()`,
+	)[0]
 }
 func (c *converter) convertFieldNodeMethod(node *parse.FieldNode, typeCheck *simplifier.State) ast.Expr {
 	return c.convertFieldNode(node, typeCheck)
 }
 func (c *converter) convertStringNode(node *parse.StringNode) *ast.BasicLit {
-	ret := &ast.BasicLit{Kind: token.STRING, Value: node.Quoted}
-	return ret
+	return &ast.BasicLit{Kind: token.STRING, Value: node.Quoted}
 }
 func (c *converter) convertBoolNode(node *parse.BoolNode) *ast.Ident {
-	ret := &ast.Ident{Name: node.String()}
-	return ret
+	return &ast.Ident{Name: node.String()}
 }
 func (c *converter) convertNumberNode(node *parse.NumberNode) *ast.BasicLit {
-	ret := &ast.BasicLit{Kind: token.INT, Value: node.Text}
+	k := token.INT
 	if node.IsComplex {
-		ret.Kind = token.IMAG
+		k = token.IMAG
 	} else if node.IsFloat {
-		ret.Kind = token.FLOAT
+		k = token.FLOAT
 	}
-	return ret
+	return &ast.BasicLit{Kind: k, Value: node.Text}
 }
 func (c *converter) convertFieldNode(node *parse.FieldNode, typeCheck *simplifier.State) ast.Expr {
 	var ret ast.Expr
@@ -771,7 +767,7 @@ func (c *converter) convertFieldNode(node *parse.FieldNode, typeCheck *simplifie
 	}
 	ismethod := typeCheck.IsMethodPath(node.Ident, typeCheck.Dot())
 	if ismethod {
-		// need to embed the last ast.SelectorExpr with a CallExpr
+		// the last ast.SelectorExpr needs to be embeded with a CallExpr
 		ret = &ast.CallExpr{Fun: ret}
 	}
 	return ret
@@ -797,87 +793,118 @@ func (c *converter) convertVariableNode(node *parse.VariableNode, typeCheck *sim
 	}
 	ismethod := typeCheck.IsMethodPath(node.Ident[1:], typeCheck.GetVar(node.Ident[0]))
 	if ismethod {
-		// need to embed the last ast.SelectorExpr with a CallExpr
+		// the last ast.SelectorExpr needs to be embeded with a CallExpr
 		ret = &ast.CallExpr{Fun: ret}
 	}
 	return ret
 }
 
-func makeWriteErrorDecl() []ast.Stmt {
-	gocode := `package aa
-func zz (indata interface{}) {
-  var writeErr error
-}`
-	f := stringToAst(gocode)
-	return f.Decls[0].(*ast.FuncDecl).Body.List
+func makeWriteErrorDecl() ast.Stmt {
+	return getStmtsAst(`var writeErr error`)[0]
 }
 
 func makePrelude(dataQualifier string) []ast.Stmt {
-	gocode := `package aa
-func zz (indata interface{}) {
-  var data ` + dataQualifier + `
-  if d, ok := indata.(` + dataQualifier + `); ok {
-    data = d
-  }
-}`
-	f := stringToAst(gocode)
-	return f.Decls[0].(*ast.FuncDecl).Body.List
+	return getStmtsAst(`
+var data ` + dataQualifier + `
+if d, ok := indata.(` + dataQualifier + `); ok {
+  data = d
+}`)
 }
 
 func (c *converter) makeIoWrite(expr string, exprType reflect.Type) []ast.Stmt {
 	writeCall := ""
+	ioalias := c.compiledProgram.addImport("io")
 	switch exprType.Kind() {
 	case reflect.String:
-		writeCall = "io.WriteString(w, " + expr + ")"
+		writeCall = ioalias + ".WriteString(w, " + expr + ")"
+
 	case reflect.Int:
-		writeCall = "io.WriteString(w, strconv.Itoa(" + expr + "))"
-		c.addImport("strconv")
+		strconvalias := c.compiledProgram.addImport("strconv")
+		writeCall = ioalias + ".WriteString(w, " + strconvalias + ".Itoa(" + expr + "))"
+
 	case reflect.Int8, reflect.Int16, reflect.Int32:
-		writeCall = "io.WriteString(w, strconv.FormatInt(int64(" + expr + "), 10))"
-		c.addImport("strconv")
+		strconvalias := c.compiledProgram.addImport("strconv")
+		writeCall = ioalias + ".WriteString(w, " + strconvalias + ".FormatInt(int64(" + expr + "), 10))"
+
 	case reflect.Int64:
-		writeCall = "io.WriteString(w, strconv.FormatInt(" + expr + ", 10))"
-		c.addImport("strconv")
+		strconvalias := c.compiledProgram.addImport("strconv")
+		writeCall = ioalias + ".WriteString(w, " + strconvalias + ".FormatInt(" + expr + ", 10))"
+
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		writeCall = "io.WriteString(w, strconv.FormatUint(" + expr + ", 10))"
-		c.addImport("strconv")
+		strconvalias := c.compiledProgram.addImport("strconv")
+		writeCall = ioalias + ".WriteString(w, " + strconvalias + ".FormatUint(" + expr + ", 10))"
+
 	case reflect.Float32:
-		writeCall = "io.WriteString(w, strconv.FormatFloat(float64(" + expr + "), \"f\", -1, 32))"
-		c.addImport("strconv")
+		strconvalias := c.compiledProgram.addImport("strconv")
+		writeCall = ioalias + ".WriteString(w, " + strconvalias + ".FormatFloat(float64(" + expr + "), \"f\", -1, 32))"
+
 	case reflect.Float64:
-		writeCall = "io.WriteString(w, strconv.FormatFloat(" + expr + ", \"f\", -1, 64))"
-		c.addImport("strconv")
+		strconvalias := c.compiledProgram.addImport("strconv")
+		writeCall = ioalias + ".WriteString(w, " + strconvalias + ".FormatFloat(" + expr + ", \"f\", -1, 64))"
+
 	case reflect.Bool:
-		writeCall = "io.WriteString(w, strconv.FormatBool(" + expr + "))"
-		c.addImport("strconv")
+		strconvalias := c.compiledProgram.addImport("strconv")
+		writeCall = ioalias + ".WriteString(w, " + strconvalias + ".FormatBool(" + expr + "))"
+
 	case reflect.Slice:
 		switch exprType.Elem().Kind() {
 		case reflect.Uint8:
 			writeCall = "w.Write(" + expr + ")"
+
 		default:
-			writeCall = "fmt.Fprintf(w, \"%v\", " + expr + ")"
-			c.addImport("fmt")
+			// todo: if the type implements a Byter{Byte()[]byte},
+			// or Writer{Write(to) len, err}
+			// or Stringer{String() string}
+			// make use of those.
+			fmtalias := c.compiledProgram.addImport("fmt")
+			writeCall = fmtalias + ".Fprintf(w, \"%v\", " + expr + ")"
 		}
+
 	case reflect.Struct, reflect.Interface:
-		writeCall = "fmt.Fprintf(w, \"%v\", " + expr + ")"
-		c.addImport("fmt")
+		fmtalias := c.compiledProgram.addImport("fmt")
+		writeCall = fmtalias + ".Fprintf(w, \"%v\", " + expr + ")"
+
 	default:
 		err := fmt.Errorf(
 			"makeIoWrite: Unhandled expression relfect.type\n%v\n%#v",
 			exprType, exprType.Kind())
 		panic(err)
 	}
+	return getStmtsAst(`
+_, writeErr = ` + writeCall + `
+if writeErr!=nil{
+  return writeErr
+}`)
+}
+
+func mustBeExportedTypes(some []reflect.Type) (reflect.Type, bool) {
+	for _, s := range some {
+		switch s.Kind() {
+		case reflect.Struct:
+			if ast.IsExported(s.String()) == false {
+				return s, false
+			}
+		case reflect.Ptr:
+			if ast.IsExported(s.Elem().String()) == false {
+				return s, false
+			}
+		}
+	}
+	return nil, true
+}
+
+func getStmtsAst(strStmts string) []ast.Stmt {
+	gocode := `func zz (indata interface{}) {
+    ` + strStmts + `
+  }`
+	return getFuncBodyAst(gocode)
+}
+func getFuncBodyAst(strFunc string) []ast.Stmt {
 	gocode := `package aa
-func zz (indata interface{}) {
-  _, writeErr = ` + writeCall + `
-  if writeErr!=nil{
-    return writeErr
-  }
-}`
+` + strFunc
 	f := stringToAst(gocode)
 	return f.Decls[0].(*ast.FuncDecl).Body.List
 }
-
 func stringToAst(gocode string) *ast.File {
 	f, err := parser.ParseFile(token.NewFileSet(), "", gocode, 0)
 	if err != nil {
