@@ -431,7 +431,7 @@ func makeConf(
 		funcsmap = htmlFuncsExport
 		publicIdents = htmlPublicIdents
 	}
-	ret := makeTemplateToCompileNew(
+	ret := makeTemplateToCompile(
 		compiled.TemplateConfiguration{
 			Data:              data,
 			DataConfiguration: makeDataConfiguration(data),

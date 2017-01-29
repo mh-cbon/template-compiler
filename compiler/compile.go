@@ -26,11 +26,12 @@ type CompiledTemplatesProgram struct {
 	builtinTexts map[string]string
 }
 
-// NewCompiledTemplatesProgram ...
-func NewCompiledTemplatesProgram(varName string /*, conf *compiled.Configuration*/) *CompiledTemplatesProgram {
+// NewCompiledTemplatesProgram prepare a new instance.
+// it automatically adds io and template/parse packages,
+// and declares static idents.
+func NewCompiledTemplatesProgram(varName string) *CompiledTemplatesProgram {
 	ret := &CompiledTemplatesProgram{
 		varName: varName,
-		// config:  conf,
 		idents: []string{
 			"t", "w", "data", "indata", varName,
 		},
@@ -41,7 +42,7 @@ func NewCompiledTemplatesProgram(varName string /*, conf *compiled.Configuration
 	return ret
 }
 
-// CompileAndWrite ...
+// CompileAndWrite the configuration and write the resulting program to config.OutPath.
 func (c *CompiledTemplatesProgram) CompileAndWrite(config *compiled.Configuration) error {
 	program, err := c.Compile(config)
 	if err != nil {
@@ -53,7 +54,7 @@ func (c *CompiledTemplatesProgram) CompileAndWrite(config *compiled.Configuratio
 	return nil
 }
 
-//Compile ....
+//Compile the configuration, it returns a string of the output program.
 func (c *CompiledTemplatesProgram) Compile(config *compiled.Configuration) (string, error) {
 	if err := updateOutPkg(config); err != nil {
 		return "", err
@@ -67,13 +68,15 @@ func (c *CompiledTemplatesProgram) Compile(config *compiled.Configuration) (stri
 	return c.compileTemplates(config.OutPkg, templatesToCompile)
 }
 
-//compileTemplates ....
+//compileTemplates generates the output program for the given templates to compile.
 func (c *CompiledTemplatesProgram) compileTemplates(outpkg string, templatesToCompile []*TemplateToCompile) (string, error) {
 	if err := c.convertTemplates(templatesToCompile); err != nil {
 		return "", err
 	}
 	return c.generateProgram(outpkg, templatesToCompile), nil
 }
+
+// convertTemplates convert each TemplateToCompile into functions.
 func (c *CompiledTemplatesProgram) convertTemplates(templatesToCompile []*TemplateToCompile) error {
 	for _, t := range templatesToCompile {
 		for _, f := range t.files {
@@ -99,7 +102,7 @@ func (c *CompiledTemplatesProgram) convertTemplates(templatesToCompile []*Templa
 	return nil
 }
 
-// ...
+// getTemplatesToCompile prepares the templates for the given configuration.
 func (c *CompiledTemplatesProgram) getTemplatesToCompile(conf *compiled.Configuration) ([]*TemplateToCompile, error) {
 	templatesToCompile := convertConfigToTemplatesToCompile(conf)
 	for _, t := range templatesToCompile {
@@ -110,6 +113,9 @@ func (c *CompiledTemplatesProgram) getTemplatesToCompile(conf *compiled.Configur
 	return templatesToCompile, nil
 }
 
+// updatedOutPkg ensure the configuration OutPkg is set.
+// if OutPkg is empty, it tries to detect the package automatically
+// by reading the files existing in the OutPath directory and extracting the package declaration.
 func updateOutPkg(conf *compiled.Configuration) error {
 	if conf.OutPkg == "" {
 		pkgName, err := LookupPackageName(conf.OutPath)
@@ -121,6 +127,7 @@ func updateOutPkg(conf *compiled.Configuration) error {
 	return nil
 }
 
+// getDataQualifier returns the contextualized data qualifer for the program imports.
 func (c *CompiledTemplatesProgram) getDataQualifier(dataConf compiled.DataConfiguration) string {
 	dataAlias := c.addImport(dataConf.PkgPath)
 	dataQualifier := fmt.Sprintf("%v.%v", dataAlias, dataConf.DataTypeName)
@@ -130,6 +137,10 @@ func (c *CompiledTemplatesProgram) getDataQualifier(dataConf compiled.DataConfig
 	return dataQualifier
 }
 
+// addImport adds a new import spec to the output program.
+// if the pkgpath is already imported, it is imported once only.
+// if the pkgpath collides with another exisiting ident, it is renamed appropriately.
+// it returns the alias of the pkgpath.
 func (c *CompiledTemplatesProgram) addImport(pkgpath string) string {
 	qpath := fmt.Sprintf("%q", pkgpath)
 	bpath := filepath.Base(pkgpath)
@@ -154,6 +165,7 @@ func (c *CompiledTemplatesProgram) addImport(pkgpath string) string {
 	return bpath
 }
 
+// isCollidingIdent tells if given ident will collide exisiting idents.
 func (c *CompiledTemplatesProgram) isCollidingIdent(ident string) bool {
 	// check for imports
 	for _, i := range c.imports {
@@ -170,6 +182,7 @@ func (c *CompiledTemplatesProgram) isCollidingIdent(ident string) bool {
 	return false
 }
 
+// makeFuncName produces a new unique func name.
 func (c *CompiledTemplatesProgram) makeFuncName(baseName string) string {
 	x := baseName
 	i := 0
@@ -181,6 +194,7 @@ func (c *CompiledTemplatesProgram) makeFuncName(baseName string) string {
 	return x
 }
 
+// createFunc creates the ast code of a compiled template function with given name.
 func (c *CompiledTemplatesProgram) createFunc(name string) *ast.FuncDecl {
 	gocode := fmt.Sprintf(
 		`package aa
@@ -193,6 +207,7 @@ func %v(t parse.Templater, w io.Writer, indata interface{}) error {}`,
 	return fn
 }
 
+// addBuiltintText registers a static builtin text to the program.
 func (c *CompiledTemplatesProgram) addBuiltintText(text string) string {
 	if x, ok := c.builtinTexts[text]; ok {
 		return x
@@ -201,6 +216,9 @@ func (c *CompiledTemplatesProgram) addBuiltintText(text string) string {
 	return c.builtinTexts[text]
 }
 
+// generateInitFunc generates the init func body.
+// the init func contains the code to declare the compiled templates
+// and associate their defined templates.
 func (c *CompiledTemplatesProgram) generateInitFunc(tpls []*TemplateToCompile) string {
 	initfunc := ""
 	initfunc += fmt.Sprintf("func init () {\n")
@@ -229,6 +247,8 @@ func (c *CompiledTemplatesProgram) generateInitFunc(tpls []*TemplateToCompile) s
 	initfunc += fmt.Sprintf("}")
 	return initfunc
 }
+
+// generateProgram generates the output program.
 func (c *CompiledTemplatesProgram) generateProgram(outpkg string, tpls []*TemplateToCompile) string {
 	program := fmt.Sprintf("package %v\n\n", outpkg)
 	program += fmt.Sprintf("//golint:ignore\n\n")
@@ -241,6 +261,7 @@ func (c *CompiledTemplatesProgram) generateProgram(outpkg string, tpls []*Templa
 	return program
 }
 
+// generateImportStmt generates all import statements.
 func (c *CompiledTemplatesProgram) generateImportStmt() string {
 	importStmt := ""
 	importStmt += fmt.Sprintf("import (\n")
@@ -255,6 +276,7 @@ func (c *CompiledTemplatesProgram) generateImportStmt() string {
 	return importStmt
 }
 
+// generateBuiltins generates the builtins text variable declarations.
 func (c *CompiledTemplatesProgram) generateBuiltins() string {
 	builtins := ""
 	for text, name := range c.builtinTexts {
@@ -263,23 +285,22 @@ func (c *CompiledTemplatesProgram) generateBuiltins() string {
 	return builtins
 }
 
+// convertConfigToTemplatesToCompile convert the confguration into instances of TemplateToCompile
 func convertConfigToTemplatesToCompile(conf *compiled.Configuration) []*TemplateToCompile {
 	ret := []*TemplateToCompile{}
 	for _, t := range conf.Templates {
-		ret = append(ret,
-			makeTemplateToCompileNew(t),
-		)
+		ret = append(ret, makeTemplateToCompile(t))
 	}
 	return ret
 }
 
-// TemplateToCompile ...
+// TemplateToCompile links a configuration and all the template files it matches.
 type TemplateToCompile struct {
 	*compiled.TemplateConfiguration
 	files []TemplateFileToCompile
 }
 
-// TemplateFileToCompile ...
+// TemplateFileToCompile links a template file with all the templates defined in it.
 type TemplateFileToCompile struct {
 	name             string
 	tplsTree         map[string]*parse.Tree
@@ -288,6 +309,7 @@ type TemplateFileToCompile struct {
 	definedTemplates []string
 }
 
+// names returns all template names sorted asc.
 func (t TemplateFileToCompile) names() []string {
 	strs := []string{}
 	for name := range t.tplsTree {
@@ -297,7 +319,8 @@ func (t TemplateFileToCompile) names() []string {
 	return strs
 }
 
-func makeTemplateToCompileNew(templateConf compiled.TemplateConfiguration) *TemplateToCompile {
+// makeTemplateToCompile creates a new instance of TemplateToCompile for the given TemplateConfiguration.
+func makeTemplateToCompile(templateConf compiled.TemplateConfiguration) *TemplateToCompile {
 	ret := &TemplateToCompile{
 		TemplateConfiguration: &templateConf,
 		files: []TemplateFileToCompile{},
@@ -305,6 +328,7 @@ func makeTemplateToCompileNew(templateConf compiled.TemplateConfiguration) *Temp
 	return ret
 }
 
+// prepare evalutes the files of the TemplateConfiguration and prepares the resulting templates.
 func (t *TemplateToCompile) prepare() error {
 	tplsPath, err := filepath.Glob(t.TemplatesPath)
 	if err != nil {
@@ -320,6 +344,7 @@ func (t *TemplateToCompile) prepare() error {
 	return nil
 }
 
+//makeTemplateFileToCompileFromFile creates a new TemplateFileToCompile instance for the given template file.
 func makeTemplateFileToCompileFromFile(tplPath string, data interface{}, funcs map[string]interface{}, HTML bool) (TemplateFileToCompile, error) {
 
 	fileTpl := TemplateFileToCompile{
@@ -358,6 +383,7 @@ func makeTemplateFileToCompileFromFile(tplPath string, data interface{}, funcs m
 	return fileTpl, nil
 }
 
+//makeTemplateFileToCompileFromStr creates a new TemplateFileToCompile instance for the given template content.
 func makeTemplateFileToCompileFromStr(name, tplContent string, data interface{}, funcs map[string]interface{}, HTML bool) (TemplateFileToCompile, error) {
 
 	fileTpl := TemplateFileToCompile{
@@ -392,7 +418,7 @@ func makeTemplateFileToCompileFromStr(name, tplContent string, data interface{},
 	return fileTpl, nil
 }
 
-// compileTextTemplate compiles a file template as a text/template.
+// compileTextTemplate compiles a file template as a text/template, it returns a map of trees by their name.
 func compileTextTemplate(name string, content string, funcsMap map[string]interface{}) (map[string]*parse.Tree, error) {
 	ret := map[string]*parse.Tree{}
 
@@ -411,7 +437,7 @@ func compileTextTemplate(name string, content string, funcsMap map[string]interf
 	return ret, nil
 }
 
-// compileHTMLTemplate compiles a file template as an html/template.
+// compileHTMLTemplate compiles a file template as an html/template, it returns a map of trees by their name.
 func compileHTMLTemplate(name string, content string, funcsMap map[string]interface{}) (map[string]*parse.Tree, error) {
 	ret := map[string]*parse.Tree{}
 
