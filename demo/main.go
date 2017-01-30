@@ -28,10 +28,19 @@ var compiledTemplates = compiled.New(
 			TemplatesData: map[string]interface{}{
 				"*":     nil,
 				"embed": data.MyTemplateData{},
+				// "embed": OtherTemplateData{},
 			},
 		},
 	},
 ).SetPkg("main")
+
+// later, re arrange the demo to not use main,
+// as its not a good case to run.
+// example:
+// - the loader is not able to load such main package,
+// - the bootstraper can t import such package to consume the data
+// https://godoc.org/golang.org/x/tools/go/loader#hdr-CONCEPTS_AND_TERMINOLOGY
+// type OtherTemplateData struct{}
 
 func main() {
 
