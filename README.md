@@ -83,24 +83,24 @@ import (
 var compiledTemplates = compiled.New(
   "gen.go",
   []compiled.TemplateConfiguration{
-    compiled.TemplateConfiguration{
-      HTML:          true,
-      TemplatesPath: "tmpl/*.tpl",
-			TemplatesData: map[string]interface{}{
-				"*": data.MyTemplateData{},
-			},
-      FuncsMap:      []string{
-        "somewhere/mypackage:tplFuncs",
-      },
+  compiled.TemplateConfiguration{
+    HTML:          true,
+    TemplatesPath: "tmpl/*.tpl",
+    TemplatesData: map[string]interface{}{
+      "*": data.MyTemplateData{},
     },
-		compiled.TemplateConfiguration{
-			TemplateName:    "notafile",
-			TemplateContent: `hello!{{define "embed"}}{{.Email}} {{.Name}}{{end}}`,
-			TemplatesData: map[string]interface{}{
-				"*": nil,
-				"embed": data.MyTemplateData{},
-			},
-		},
+    FuncsMap:      []string{
+      "somewhere/mypackage:tplFuncs",
+    },
+  },
+  compiled.TemplateConfiguration{
+    TemplateName:    "notafile",
+    TemplateContent: `hello!{{define "embed"}}{{.Email}} {{.Name}}{{end}}`,
+    TemplatesData: map[string]interface{}{
+      "*": nil,
+      "embed": data.MyTemplateData{},
+    },
+  },
   },
 )
 
