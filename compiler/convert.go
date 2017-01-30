@@ -16,6 +16,7 @@ import (
 	"github.com/mh-cbon/template-tree-simplifier/simplifier"
 )
 
+// converter holds data to convert a template tree into a function.
 type converter struct {
 	tree            *parse.Tree
 	writerName      string
@@ -27,6 +28,7 @@ type converter struct {
 	publicIdents    []map[string]string
 }
 
+// createErrVars creates a unique error var name for a fucntion scope.
 func (c *converter) createErrVars() string {
 	c.errvars++
 	if c.errvars == 0 {
@@ -35,10 +37,15 @@ func (c *converter) createErrVars() string {
 	return fmt.Sprintf("err%v", c.errvars)
 }
 
+// state is a struct to navigate into functions of a go code.
 type state struct {
 	typeCheck *simplifier.State
 	current   *scope
 }
+
+// scope is the a go code scope,
+// dotVars matches {{.}} of a template for a given scope,
+// body is the current BlockStmt on whih new statements are added
 type scope struct {
 	dotVars []string
 	node    ast.Node
@@ -46,10 +53,12 @@ type scope struct {
 	parent  *scope
 }
 
+// addNode appendsa statement to the current BlockStmt
 func (s *state) addNode(n ast.Stmt) {
 	s.current.body.List = append(s.current.body.List, n)
 }
 
+// enter into a BlockStmt with a reference to the current dotVar
 func (s *state) enter(body *ast.BlockStmt, currentDotVar string) {
 	if body == nil {
 		err := fmt.Errorf("state.enter: Impossible to enter a nil ast.Node")
@@ -62,16 +71,19 @@ func (s *state) enter(body *ast.BlockStmt, currentDotVar string) {
 	}
 }
 
+// leave a scope and exchange current scope with parent
 func (s *state) leave() {
 	if s.current != nil {
 		s.current = s.current.parent
 	}
 }
 
+// dotVar returns the name of the go variable for current {{.}}
 func (s *state) dotVar() string {
 	return s.current.dotVars[len(s.current.dotVars)-1]
 }
 
+// convertTplTree convert a template Tree into a go function
 func convertTplTree(
 	fnname string,
 	tree *parse.Tree,
@@ -93,19 +105,25 @@ func convertTplTree(
 
 	c.fn = c.compiledProgram.createFunc(fnname)
 
+	// if the template uses {{.}} anywhere, adds a prelude to type input data appropiately.
 	if simplifier.IsUsingDot(c.tree) {
 		dataQualifier := compiledProgram.getDataQualifier(dataConfiguration)
 		c.fn.Body.List = append(c.fn.Body.List, makePrelude(dataQualifier)...)
 	}
+	// if the template prints anything, adds a writeError for the rest of the function.
 	if simplifier.PrintsAnything(c.tree) {
 		c.fn.Body.List = append(c.fn.Body.List, makeWriteErrorDecl())
 	}
 
+	// enter into the function scope
 	typeCheck.Enter()
-	c.state.enter(c.fn.Body, "data")
+	c.state.enter(c.fn.Body, "data") // data is a static name.
+	// browse nodes and convert expressions.
 	c.convert(c.tree.Root, typeCheck)
+	// leave function scope
 	c.state.leave()
 	typeCheck.Leave()
+	// add a default return nil to the function body
 	injectReturnNil(c.fn)
 	return nil // todo: get errors from sub calls and forward higher.
 }
