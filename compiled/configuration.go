@@ -42,6 +42,8 @@ type Configuration struct {
 type TemplateConfiguration struct {
 	HTML                       bool
 	TemplatesPath              string
+	TemplateName               string
+	TemplateContent            string
 	TemplatesData              map[string]interface{}
 	TemplatesDataConfiguration map[string]DataConfiguration
 	FuncsMap                   []string

@@ -359,12 +359,20 @@ func makeTemplateToCompile(templateConf compiled.TemplateConfiguration) *Templat
 
 // prepare evalutes the files of the TemplateConfiguration and prepares the resulting templates.
 func (t *TemplateToCompile) prepare() error {
-	tplsPath, err := filepath.Glob(t.TemplatesPath)
-	if err != nil {
-		return fmt.Errorf("Failed to glob the templates: %v %v", t.TemplatesPath, err)
-	}
-	for _, tplPath := range tplsPath {
-		fileTpl, err := makeTemplateFileToCompileFromFile(tplPath, t)
+	if t.TemplatesPath != "" {
+		tplsPath, err := filepath.Glob(t.TemplatesPath)
+		if err != nil {
+			return fmt.Errorf("Failed to glob the templates: %v %v", t.TemplatesPath, err)
+		}
+		for _, tplPath := range tplsPath {
+			fileTpl, err := makeTemplateFileToCompileFromFile(tplPath, t)
+			if err != nil {
+				return err
+			}
+			t.files = append(t.files, fileTpl)
+		}
+	} else {
+		fileTpl, err := makeTemplateFileToCompileFromStr(t.TemplateName, t.TemplateContent, t)
 		if err != nil {
 			return err
 		}
