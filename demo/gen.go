@@ -8,14 +8,15 @@ import (
 	aliasdata "github.com/mh-cbon/template-compiler/demo/data"
 	"text/template"
 	aliastemplate "github.com/mh-cbon/template-compiler/std/html/template"
+	"fmt"
 )
 
-var builtin3 = []byte(" World!\n")
-var builtin4 = []byte("Hello")
-var builtin5 = []byte("hello!")
 var builtin0 = []byte("Hello from a!\n")
 var builtin1 = []byte("Hello from b!\n")
 var builtin2 = []byte("\n")
+var builtin3 = []byte(" World!\n")
+var builtin4 = []byte("Hello")
+var builtin5 = []byte("hello!")
 
 
 func init () {
@@ -24,11 +25,16 @@ func init () {
   compiledTemplates.Add("c.tpl", fncTpl)
   compiledTemplates.Add("d.tpl", fndTpl)
   compiledTemplates.Add("tt", fndTplTt)
+  compiledTemplates.Add("embed", fnnotafileEmbed)
   compiledTemplates.Add("notafile", fnnotafile)
   tpl3X0 := compiledTemplates.MustGet("d.tpl")
   tpl3Y0 := compiledTemplates.MustGet("tt")
   tpl3X0, _ = tpl3X0.Compiled(tpl3Y0)
   compiledTemplates.Set("d.tpl", tpl3X0)
+  tpl0X0 := compiledTemplates.MustGet("notafile")
+  tpl0Y0 := compiledTemplates.MustGet("embed")
+  tpl0X0, _ = tpl0X0.Compiled(tpl0Y0)
+  compiledTemplates.Set("notafile", tpl0X0)
 }
 
 func fnaTpl(t parse.Templater, w io.Writer, indata interface{}) error {
@@ -170,6 +176,19 @@ func fndTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 func fndTplTt(t parse.Templater, w io.Writer, indata interface{}) error {
 	var writeErr error
 	_, writeErr = w.Write(builtin4)
+	if writeErr != nil {
+		return writeErr
+	}
+	return nil
+}
+
+func fnnotafileEmbed(t parse.Templater, w io.Writer, indata interface{}) error {
+	var data aliasdata.MyTemplateData
+	if d, ok := indata.(aliasdata.MyTemplateData); ok {
+		data = d
+	}
+	var writeErr error
+	_, writeErr = fmt.Fprintf(w, "%v", data)
 	if writeErr != nil {
 		return writeErr
 	}

@@ -24,9 +24,10 @@ var compiledTemplates = compiled.New(
 		},
 		compiled.TemplateConfiguration{
 			TemplateName:    "notafile",
-			TemplateContent: `hello!`,
+			TemplateContent: `hello!{{define "embed"}}{{.}}{{end}}`,
 			TemplatesData: map[string]interface{}{
-				"*": nil,
+				"*":     nil,
+				"embed": data.MyTemplateData{},
 			},
 		},
 	},
