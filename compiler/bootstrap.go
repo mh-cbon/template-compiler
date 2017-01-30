@@ -7,7 +7,6 @@ import (
 	"go/parser"
 	"go/token"
 	"path/filepath"
-	"strconv"
 
 	"github.com/mh-cbon/export-funcmap/export"
 )
@@ -164,6 +163,7 @@ func prepareConfiguration(importsContext []*ast.ImportSpec, confNode *ast.GenDec
 	// then browse each key / value expression,
 	// - for an HTML key, check if it says true/false
 	// - for a Data key, creates and adds a DataConfiguration{}
+	// - for a TemplatesData key, searches for all related package and import them
 	// - for a FuncsMap key, exports them to their symbolic version, and their public idents,
 	//   add those new data to the configuration of the template.
 	templatesConf := compiledNew.Args[1].(*ast.CompositeLit)
@@ -174,15 +174,11 @@ func prepareConfiguration(importsContext []*ast.ImportSpec, confNode *ast.GenDec
 		// manage HTML key
 		isHTML := isAnHTMLTemplateConf(templateConf)
 
-		// manage Data key
-		if dataExpr, isPtr := getDataKeySelExpr(templateConf); dataExpr != nil {
-			pkgPath, newKv := makeDataConfigurationKeyValue(importsContext, dataExpr, isPtr)
-			templateConf.Elts = append(templateConf.Elts, newKv)
-			newImports = append(newImports, pkgPath)
-		} else {
-			panic(
-				fmt.Errorf("Expected template configuration to contain a Data key"),
-			)
+		// search for data packages and import them
+		for _, i := range getDataImports(importsContext, templateConf) {
+			if containsImportSpec(newImports, i) == false {
+				newImports = append(newImports, i)
+			}
 		}
 
 		// manage FuncsMap key
@@ -293,39 +289,18 @@ func exportFuncsMap(funcExports []string) (*ast.CompositeLit, *ast.CompositeLit,
 	return funcsMapValue, publicIdentValue, imports, nil
 }
 
-func getDataKeySelExpr(templateConf *ast.CompositeLit) (*ast.SelectorExpr, bool) {
-	var ret *ast.SelectorExpr
-	isPtr := false
-	if dataKey := getKeyValue(templateConf, "Data"); dataKey != nil {
-		switch valueType := dataKey.Value.(type) {
-		case *ast.CompositeLit:
-			ret = valueType.Type.(*ast.SelectorExpr)
-		case *ast.UnaryExpr:
-			ret = valueType.X.(*ast.CompositeLit).Type.(*ast.SelectorExpr)
-			isPtr = true
+func getDataImports(importsContext []*ast.ImportSpec, templateConf *ast.CompositeLit) []*ast.ImportSpec {
+	ret := []*ast.ImportSpec{}
+	kv := getKeyValue(templateConf, "TemplatesData")
+	if kv != nil {
+		values := kv.Value.(*ast.CompositeLit).Elts
+		for _, v := range values {
+			sel := v.(*ast.KeyValueExpr).Value.(*ast.CompositeLit).Type.(*ast.SelectorExpr)
+			dataImportSpec := getPkgPath(importsContext, sel.X.(*ast.Ident).Name)
+			ret = append(ret, dataImportSpec)
 		}
 	}
-	return ret, isPtr
-}
-
-// creates a DataConfiguration instance of a data instanciation ast.Node (yourpkg.DataType{})
-func makeDataConfigurationKeyValue(importsContext []*ast.ImportSpec, expr *ast.SelectorExpr, isPtr bool) (*ast.ImportSpec, *ast.KeyValueExpr) {
-	dataImportSpec := getPkgPath(importsContext, expr.X.(*ast.Ident).Name)
-	pkgPath := dataImportSpec.Path.Value
-	pkgPath = pkgPath[1 : len(pkgPath)-1]
-	pkg := filepath.Base(pkgPath)
-	gocode := `package xx
-  var x = compiled.DataConfiguration{
-      IsPtr: ` + strconv.FormatBool(isPtr) + `,
-      DataTypeName: "` + expr.Sel.Name + `",
-      DataType: "` + pkg + `.` + expr.Sel.Name + `",
-      PkgPath: "` + pkgPath + `",
-  }`
-	newNode := stringToAst(gocode)
-	return dataImportSpec, &ast.KeyValueExpr{
-		Key:   &ast.Ident{Name: "DataConfiguration"},
-		Value: newNode.Decls[0].(*ast.GenDecl).Specs[0].(*ast.ValueSpec).Values[0],
-	}
+	return ret
 }
 
 func getPkgPath(importsContext []*ast.ImportSpec, name string) *ast.ImportSpec {
@@ -353,6 +328,21 @@ func strIndex(list []string, search string) int {
 }
 func containsStr(list []string, search string) bool {
 	return strIndex(list, search) > -1
+}
+
+func containsImportSpec(list []*ast.ImportSpec, search *ast.ImportSpec) bool {
+	for _, i := range list {
+		if search.Name != nil {
+			if i.Name != nil && i.Name.Name == search.Name.Name {
+				return true
+			}
+		} else {
+			if search.Path.Value == i.Path.Value {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func parseGoFilePath(file string) (*ast.File, error) {

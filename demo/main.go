@@ -18,7 +18,9 @@ var compiledTemplates = compiled.New(
 		compiled.TemplateConfiguration{
 			HTML:          true,
 			TemplatesPath: "templates/*.tpl",
-			Data:          data.MyTemplateData{},
+			TemplatesData: map[string]interface{}{
+				"*": data.MyTemplateData{},
+			},
 		},
 	},
 ).SetPkg("main")

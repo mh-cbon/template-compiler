@@ -84,12 +84,17 @@ func (c *CompiledTemplatesProgram) convertTemplates(templatesToCompile []*Templa
 				f.tplsFunc[name] = c.makeFuncName(f.tplsFunc[name])
 				f.tplsFunc[name] = snakeToCamel(f.tplsFunc[name])
 
-				err := convertTplTree(
+				dataConfig, err := t.getDataConfiguration(name)
+				if err != nil {
+					return err
+				}
+
+				err = convertTplTree(
 					f.tplsFunc[name],
 					f.tplsTree[name],
 					t.FuncsExport,
 					t.PublicIdents,
-					t.DataConfiguration,
+					dataConfig,
 					f.tplsTypeCheck[name],
 					c,
 				)
@@ -319,6 +324,30 @@ func (t TemplateFileToCompile) names() []string {
 	return strs
 }
 
+// getDataConfiguration returns the data configuration for the given template name.
+func (t TemplateToCompile) getDataConfiguration(name string) (compiled.DataConfiguration, error) {
+	if ret, ok := t.TemplatesDataConfiguration[name]; ok {
+		return ret, nil
+	}
+	if ret, ok := t.TemplatesDataConfiguration["*"]; ok {
+		return ret, nil
+	}
+	fmt.Printf("%#v\n", t.TemplatesData)
+	fmt.Printf("%#v\n", t.TemplatesDataConfiguration)
+	return compiled.DataConfiguration{}, fmt.Errorf("Template data configuration not found for %v", name)
+}
+
+// getData returns the data value for the given template name.
+func (t TemplateToCompile) getData(name string) (interface{}, error) {
+	if ret, ok := t.TemplatesData[name]; ok {
+		return ret, nil
+	}
+	if ret, ok := t.TemplatesData["*"]; ok {
+		return ret, nil
+	}
+	return nil, fmt.Errorf("Template data configuration not found for %v", name)
+}
+
 // makeTemplateToCompile creates a new instance of TemplateToCompile for the given TemplateConfiguration.
 func makeTemplateToCompile(templateConf compiled.TemplateConfiguration) *TemplateToCompile {
 	ret := &TemplateToCompile{
@@ -335,7 +364,7 @@ func (t *TemplateToCompile) prepare() error {
 		return fmt.Errorf("Failed to glob the templates: %v %v", t.TemplatesPath, err)
 	}
 	for _, tplPath := range tplsPath {
-		fileTpl, err := makeTemplateFileToCompileFromFile(tplPath, t.Data, t.FuncsExport, t.HTML)
+		fileTpl, err := makeTemplateFileToCompileFromFile(tplPath, t)
 		if err != nil {
 			return err
 		}
@@ -345,7 +374,7 @@ func (t *TemplateToCompile) prepare() error {
 }
 
 //makeTemplateFileToCompileFromFile creates a new TemplateFileToCompile instance for the given template file.
-func makeTemplateFileToCompileFromFile(tplPath string, data interface{}, funcs map[string]interface{}, HTML bool) (TemplateFileToCompile, error) {
+func makeTemplateFileToCompileFromFile(tplPath string, tplToCompile *TemplateToCompile) (TemplateFileToCompile, error) {
 
 	fileTpl := TemplateFileToCompile{
 		name:             filepath.Base(tplPath),
@@ -360,9 +389,10 @@ func makeTemplateFileToCompileFromFile(tplPath string, data interface{}, funcs m
 		return fileTpl, err
 	}
 	mainName := fileTpl.name
+	funcs := tplToCompile.FuncsExport
 
 	var treeNames map[string]*parse.Tree
-	if HTML {
+	if tplToCompile.HTML {
 		treeNames, err = compileHTMLTemplate(mainName, string(content), funcs)
 	} else {
 		treeNames, err = compileTextTemplate(mainName, string(content), funcs)
@@ -372,6 +402,10 @@ func makeTemplateFileToCompileFromFile(tplPath string, data interface{}, funcs m
 	}
 	fileTpl.tplsTree = treeNames
 	for treeName, tree := range fileTpl.tplsTree {
+		data, err := tplToCompile.getData(treeName)
+		if err != nil {
+			return fileTpl, err
+		}
 		fileTpl.tplsTypeCheck[treeName] = simplifier.TransformTree(tree, data, funcs)
 		if treeName != mainName {
 			fileTpl.tplsFunc[treeName] = cleanTplName("fn" + mainName + "_" + treeName)
@@ -384,7 +418,7 @@ func makeTemplateFileToCompileFromFile(tplPath string, data interface{}, funcs m
 }
 
 //makeTemplateFileToCompileFromStr creates a new TemplateFileToCompile instance for the given template content.
-func makeTemplateFileToCompileFromStr(name, tplContent string, data interface{}, funcs map[string]interface{}, HTML bool) (TemplateFileToCompile, error) {
+func makeTemplateFileToCompileFromStr(name, tplContent string, tplToCompile *TemplateToCompile) (TemplateFileToCompile, error) {
 
 	fileTpl := TemplateFileToCompile{
 		name:             name,
@@ -393,10 +427,11 @@ func makeTemplateFileToCompileFromStr(name, tplContent string, data interface{},
 		tplsTypeCheck:    map[string]*simplifier.State{},
 		definedTemplates: []string{},
 	}
+	funcs := tplToCompile.FuncsExport
 
 	var err error
 	var treeNames map[string]*parse.Tree
-	if HTML {
+	if tplToCompile.HTML {
 		treeNames, err = compileHTMLTemplate(name, tplContent, funcs)
 	} else {
 		treeNames, err = compileTextTemplate(name, tplContent, funcs)
@@ -407,6 +442,10 @@ func makeTemplateFileToCompileFromStr(name, tplContent string, data interface{},
 	fileTpl.tplsTree = treeNames
 	mainName := fileTpl.name
 	for treeName, tree := range fileTpl.tplsTree {
+		data, err := tplToCompile.getData(treeName)
+		if err != nil {
+			return fileTpl, err
+		}
 		fileTpl.tplsTypeCheck[treeName] = simplifier.TransformTree(tree, data, funcs)
 		if treeName != mainName {
 			fileTpl.tplsFunc[treeName] = cleanTplName("fn" + mainName + "_" + treeName)

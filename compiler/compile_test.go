@@ -30,9 +30,14 @@ func TestCompile(t *testing.T) {
 			varName: "xx",
 			outPkg:  "gen",
 			conf: []*TemplateToCompile{
-				makeConf(data.MyTemplateData{}, false, map[string]string{
-					"a.tpl": ``,
-				}),
+				makeConf(false,
+					map[string]interface{}{
+						"a.tpl": data.MyTemplateData{},
+					},
+					map[string]string{
+						"a.tpl": ``,
+					},
+				),
 			},
 			expectedImports: []string{
 				"io",
@@ -52,9 +57,13 @@ return nil
 			varName: "yy",
 			outPkg:  "notgen",
 			conf: []*TemplateToCompile{
-				makeConf(data.MyTemplateData{}, false, map[string]string{
-					"b.tpl": `{{$y := 4}}{{$y}}{{.}}`,
-				}),
+				makeConf(false,
+					map[string]interface{}{
+						"b.tpl": data.MyTemplateData{},
+					},
+					map[string]string{
+						"b.tpl": `{{$y := 4}}{{$y}}{{.}}`,
+					}),
 			},
 			expectedImports: []string{
 				"io",
@@ -91,9 +100,12 @@ yy.Add("b.tpl", fnbTpl)
 			varName: "yy",
 			outPkg:  "notgen",
 			conf: []*TemplateToCompile{
-				makeConf(data.MyTemplateData{}, true, map[string]string{
-					"b.tpl": `samebuiltin{{$y := 4}}samebuiltin{{$y}}samebuiltin`,
-				}),
+				makeConf(true,
+					map[string]interface{}{
+						"b.tpl": data.MyTemplateData{},
+					}, map[string]string{
+						"b.tpl": `samebuiltin{{$y := 4}}samebuiltin{{$y}}samebuiltin`,
+					}),
 			},
 			expectedImports: []string{
 				"io",
@@ -135,9 +147,13 @@ yy.Add("b.tpl", fnbTpl)
 			varName: "yy",
 			outPkg:  "notgen",
 			conf: []*TemplateToCompile{
-				makeConf(&data.MyTemplateData{}, true, map[string]string{
-					"b.tpl": `{{$y := true}}{{$y}}{{.}}`,
-				}),
+				makeConf(true,
+					map[string]interface{}{
+						"b.tpl": &data.MyTemplateData{},
+					},
+					map[string]string{
+						"b.tpl": `{{$y := true}}{{$y}}{{.}}`,
+					}),
 			},
 			expectedImports: []string{
 				"io",
@@ -175,9 +191,13 @@ yy.Add("b.tpl", fnbTpl)
 			varName: "yy",
 			outPkg:  "notgen",
 			conf: []*TemplateToCompile{
-				makeConf(data.MyTemplateData{}, false, map[string]string{
-					"b.tpl": `{{define "z"}}z template{{end}}b template`,
-				}),
+				makeConf(false,
+					map[string]interface{}{
+						"b.tpl": &data.MyTemplateData{},
+						"z":     &data.MyTemplateData{},
+					}, map[string]string{
+						"b.tpl": `{{define "z"}}z template{{end}}b template`,
+					}),
 			},
 			expectedImports: []string{
 				"io",
@@ -218,12 +238,20 @@ yy.Add("b.tpl", fnbTpl)
 			varName: "yy",
 			outPkg:  "notgen",
 			conf: []*TemplateToCompile{
-				makeConf(data.MyTemplateData{}, false, map[string]string{
-					"b.tpl": `{{define "z"}}z template{{end}}b template`,
-				}),
-				makeConf(data.MyTemplateData{}, false, map[string]string{
-					"b.tpl": `{{define "x"}}x template{{end}}b template 2`,
-				}),
+				makeConf(false,
+					map[string]interface{}{
+						"b.tpl": data.MyTemplateData{},
+						"z":     data.MyTemplateData{},
+					}, map[string]string{
+						"b.tpl": `{{define "z"}}z template{{end}}b template`,
+					}),
+				makeConf(false,
+					map[string]interface{}{
+						"b.tpl": data.MyTemplateData{},
+						"x":     data.MyTemplateData{},
+					}, map[string]string{
+						"b.tpl": `{{define "x"}}x template{{end}}b template 2`,
+					}),
 			},
 			expectedImports: []string{
 				"io",
@@ -421,8 +449,8 @@ yy.Add("b.tpl", fnbTpl)
 }
 
 func makeConf(
-	data interface{},
 	isHTML bool,
+	data map[string]interface{},
 	tpls map[string]string,
 ) *TemplateToCompile {
 	funcsmap := textTemplateFuncExports
@@ -433,15 +461,16 @@ func makeConf(
 	}
 	ret := makeTemplateToCompile(
 		compiled.TemplateConfiguration{
-			Data:              data,
-			DataConfiguration: makeDataConfiguration(data),
-			FuncsExport:       funcsmap,
-			PublicIdents:      publicIdents,
+			HTML:                       isHTML,
+			TemplatesData:              data,
+			TemplatesDataConfiguration: makeMapDataConfiguration(data),
+			FuncsExport:                funcsmap,
+			PublicIdents:               publicIdents,
 		},
 	)
 	for name, content := range tpls {
 		t, err := makeTemplateFileToCompileFromStr(
-			name, content, data, funcsmap, isHTML,
+			name, content, ret,
 		)
 		if err != nil {
 			panic(err)
@@ -483,20 +512,27 @@ func extractFunc(file *ast.File, funcName string) *ast.FuncDecl {
 	return found
 }
 
+func makeMapDataConfiguration(some map[string]interface{}) map[string]compiled.DataConfiguration {
+	ret := map[string]compiled.DataConfiguration{}
+	for name, s := range some {
+		ret[name] = makeDataConfiguration(s)
+	}
+	return ret
+}
+
 func makeDataConfiguration(some interface{}) compiled.DataConfiguration {
 	ret := compiled.DataConfiguration{}
-	if some == nil {
-		return ret
+	if some != nil {
+		r := reflect.TypeOf(some)
+		isPtr := r.Kind() == reflect.Ptr
+		if isPtr {
+			r = r.Elem()
+		}
+		ret.IsPtr = isPtr
+		ret.DataTypeName = r.Name()
+		ret.PkgPath = r.PkgPath()
+		ret.DataType = filepath.Base(r.PkgPath()) + "." + r.Name()
 	}
-	r := reflect.TypeOf(some)
-	isPtr := r.Kind() == reflect.Ptr
-	if isPtr {
-		r = r.Elem()
-	}
-	ret.IsPtr = isPtr
-	ret.DataTypeName = r.Name()
-	ret.PkgPath = r.PkgPath()
-	ret.DataType = filepath.Base(r.PkgPath()) + "." + r.Name()
 	return ret
 }
 

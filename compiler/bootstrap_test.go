@@ -1,12 +1,9 @@
 package compiler
 
 import (
-	"fmt"
 	"go/ast"
 	"strings"
 	"testing"
-
-	"github.com/mh-cbon/template-compiler/compiled"
 )
 
 type BootstrapTestData struct {
@@ -30,8 +27,6 @@ type BootstrapTestData struct {
 	expectedLenOfAllTemplatesFuncsMap int
 	// self explanatory
 	expectedToBeHTMLTemplates []bool
-	// self explanatory
-	expectedDataConfigurations []compiled.DataConfiguration
 }
 
 func TestBootstrap(t *testing.T) {
@@ -49,7 +44,9 @@ var compiled = compiled.New(
 	[]compiled.TemplateConfiguration{
 		compiled.TemplateConfiguration{
 			TemplatesPath: "templates/*.tpl",
-			Data:          data.MyTemplateData{},
+			TemplatesData: map[string]interface{}{
+				"*": data.MyTemplateData{},
+			},
 		},
 	},
 )`,
@@ -63,21 +60,13 @@ var compiled = compiled.New(
 			expectedOutPath:             "gen.go",
 			expectedLenOfTemplateConfig: 1,
 			expectedToBeHTMLTemplates:   []bool{false},
-			expectedDataConfigurations: []compiled.DataConfiguration{
-				compiled.DataConfiguration{
-					IsPtr:        false,
-					DataTypeName: "MyTemplateData",
-					DataType:     "data.MyTemplateData",
-					PkgPath:      "github.com/mh-cbon/template-compiler/demo/data",
-				},
-			},
 		},
 		BootstrapTestData{
 			srcProgram: `package yy
 
 import (
 	"github.com/mh-cbon/template-compiler/compiled"
-	"github.com/mh-cbon/template-compiler/demo/data"
+	aliasdata "github.com/mh-cbon/template-compiler/demo/data"
 )
 
 var compiled = compiled.New(
@@ -86,7 +75,9 @@ var compiled = compiled.New(
 		compiled.TemplateConfiguration{
 			HTML:          true,
 			TemplatesPath: "templates/*.tpl",
-			Data:          data.MyTemplateData{},
+			TemplatesData: map[string]interface{}{
+				"*": aliasdata.MyTemplateData{},
+			},
 			FuncsMap:      []string{"github.com/mh-cbon/template-compiler/compiler:emptyFunc"},
 		},
 	},
@@ -96,20 +87,12 @@ var compiled = compiled.New(
 				"fmt",
 				"github.com/mh-cbon/template-compiler/compiled",
 				"github.com/mh-cbon/template-compiler/compiler",
-				"github.com/mh-cbon/template-compiler/demo/data",
+				"aliasdata:github.com/mh-cbon/template-compiler/demo/data",
 			},
 			expectedNewVarAsCall:        true,
 			expectedOutPath:             "gen.go",
 			expectedLenOfTemplateConfig: 1,
 			expectedToBeHTMLTemplates:   []bool{true},
-			expectedDataConfigurations: []compiled.DataConfiguration{
-				compiled.DataConfiguration{
-					IsPtr:        false,
-					DataTypeName: "MyTemplateData",
-					DataType:     "data.MyTemplateData",
-					PkgPath:      "github.com/mh-cbon/template-compiler/demo/data",
-				},
-			},
 		},
 		BootstrapTestData{
 			srcProgram: `package yy
@@ -117,6 +100,7 @@ var compiled = compiled.New(
 import (
 	tomate "github.com/mh-cbon/template-compiler/compiled"
 	"github.com/mh-cbon/template-compiler/demo/data"
+	aliasdata "github.com/mh-cbon/template-compiler/demo/data"
 )
 
 var compiled = tomate.New(
@@ -125,12 +109,18 @@ var compiled = tomate.New(
 		compiled.TemplateConfiguration{
 			HTML:          true,
 			TemplatesPath: "templates/*.tpl",
-			Data:          data.MyTemplateData{},
+			TemplatesData: map[string]interface{}{
+				"*": data.MyTemplateData{},
+				"*": data.MyTemplateData{},
+			},
 			FuncsMap:      []string{},
 		},
 		compiled.TemplateConfiguration{
 			TemplatesPath: "templates/*.tpl",
-			Data:          &data.MyTemplateData{},
+			TemplatesData: map[string]interface{}{
+				"*": aliasdata.MyTemplateData{},
+				"*": aliasdata.MyTemplateData{},
+			},
 			FuncsMap:      []string{},
 		},
 	},
@@ -142,25 +132,12 @@ var compiled = tomate.New(
 				"tomate:github.com/mh-cbon/template-compiler/compiled",
 				"github.com/mh-cbon/template-compiler/compiler",
 				"github.com/mh-cbon/template-compiler/demo/data",
+				"aliasdata:github.com/mh-cbon/template-compiler/demo/data",
 			},
 			expectedCompiledAlias:       "tomate",
 			expectedOutPath:             "somethingelse.go",
 			expectedLenOfTemplateConfig: 2,
 			expectedToBeHTMLTemplates:   []bool{true, false},
-			expectedDataConfigurations: []compiled.DataConfiguration{
-				compiled.DataConfiguration{
-					IsPtr:        false,
-					DataTypeName: "MyTemplateData",
-					DataType:     "data.MyTemplateData",
-					PkgPath:      "github.com/mh-cbon/template-compiler/demo/data",
-				},
-				compiled.DataConfiguration{
-					IsPtr:        true,
-					DataTypeName: "MyTemplateData",
-					DataType:     "data.MyTemplateData",
-					PkgPath:      "github.com/mh-cbon/template-compiler/demo/data",
-				},
-			},
 		},
 	}
 
@@ -199,13 +176,13 @@ var compiled = tomate.New(
 		}
 
 		importSpecs := extractImports(parsedProgram)
-		imports := convertImportsSpecs(importSpecs)
-		if len(testData.expectedImports) != len(imports) {
+		if len(testData.expectedImports) != len(importSpecs) {
 			t.Errorf("Test(%v): Expected to get %v import statements, but found %v\n\n%v",
-				i, len(testData.expectedImports), len(imports), program)
+				i, len(testData.expectedImports), len(importSpecs), program)
 			return
 		}
 
+		imports := convertImportsSpecs(importSpecs)
 		for _, im := range imports {
 			if containsStr(testData.expectedImports, im) == false {
 				t.Errorf("Test(%v): Found unexpected import=%v\n\n%v", i, im, program)
@@ -276,41 +253,6 @@ var compiled = tomate.New(
 			if expectedHTML != gotHTML {
 				t.Errorf("Test(%v): Expected template configuration(%v) to be HTML=%v, but got=%v\n\n%v",
 					i, e, expectedHTML, gotHTML, templateConfStr)
-				return
-			}
-			//-
-			expectedDataConfig := testData.expectedDataConfigurations[e]
-			dataKey := getKeyValue(templateConf, "DataConfiguration")
-			gotDataConfig := astNodeToString(dataKey)
-			//-
-			isPtrExpect := "IsPtr: false"
-			if expectedDataConfig.IsPtr {
-				isPtrExpect = "IsPtr: true"
-			}
-			if strings.Index(gotDataConfig, isPtrExpect) == -1 {
-				t.Errorf("Test(%v): Expected template data configuration(%v) to contain IsPtr=%v, but got=%v\n\n%v",
-					i, e, expectedDataConfig.IsPtr, !expectedDataConfig.IsPtr, gotDataConfig)
-				return
-			}
-			//-
-			DataTypeNameExpect := fmt.Sprintf("DataTypeName: %q", expectedDataConfig.DataTypeName)
-			if strings.Index(gotDataConfig, DataTypeNameExpect) == -1 {
-				t.Errorf("Test(%v): Expected template data configuration(%v) to contain DataTypeName=%v, but got=%v\n\n%v",
-					i, e, DataTypeNameExpect, "something different :x", gotDataConfig)
-				return
-			}
-			//-
-			DataTypeExpect := fmt.Sprintf("DataType: %q", expectedDataConfig.DataType)
-			if strings.Index(gotDataConfig, DataTypeExpect) == -1 {
-				t.Errorf("Test(%v): Expected template data configuration(%v) to contain DataType=%v, but got=%v\n\n%v",
-					i, e, DataTypeExpect, "something different :x", gotDataConfig)
-				return
-			}
-			//-
-			PkgPathExpect := fmt.Sprintf("PkgPath: %q", expectedDataConfig.PkgPath)
-			if strings.Index(gotDataConfig, PkgPathExpect) == -1 {
-				t.Errorf("Test(%v): Expected template data configuration(%v) to contain PkgPath=%v, but got=%v\n\n%v",
-					i, e, PkgPathExpect, "something different :x", gotDataConfig)
 				return
 			}
 			//-
