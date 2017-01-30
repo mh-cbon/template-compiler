@@ -87,7 +87,7 @@ var compiledTemplates = compiled.New(
     HTML:          true,
     TemplatesPath: "tmpl/*.tpl",
     TemplatesData: map[string]interface{}{
-      "*": data.MyTemplateData{},
+      "*": TplData{},
     },
     FuncsMap:      []string{
       "somewhere/mypackage:tplFuncs",
@@ -98,7 +98,7 @@ var compiledTemplates = compiled.New(
     TemplateContent: `hello!{{define "embed"}}{{.Email}} {{.Name}}{{end}}`,
     TemplatesData: map[string]interface{}{
       "*": nil,
-      "embed": data.MyTemplateData{},
+      "embed": TplData{},
     },
   },
   },
