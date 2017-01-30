@@ -213,7 +213,7 @@ with the `go:generate` comment, `go generate` also declares an environment varia
 With those hints `template-compiler` can locate and consume the variable declared with `-var` parameter.
 [We are here](https://github.com/mh-cbon/template-compiler/blob/master/main.go#L17)
 2. `template-compiler` will generate a bootstrap program.
-[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L21)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L20)
 3. The generation of the bootstrap program is about parsing, browsing, and re exporting
 an updated version of your configuration variable.
 It specifically looks for each `compiled.TemplateConfiguration{}`:
@@ -224,11 +224,11 @@ It specifically looks for each `compiled.TemplateConfiguration{}`:
   - It checks for `FuncsMap` key, and export those variable targets
     (with the help of [this package](https://github.com/mh-cbon/export-funcmap))
     to `FuncsExport` and `PublicIdents` keys.
- [We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L117)
+ [We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L116)
 4. `template-compiler` writes and compiles a go program into
 `$GOPATH/src/template-compilerxxx`.
 This program is made to compile the templates with the updated configuration.
-[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L93)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L92)
 5. `bootstrap-program` is now invoked.
 [We are here](https://github.com/mh-cbon/template-compiler/blob/master/main.go#L72)
 6. `bootstrap-program` browses the configuration value,
@@ -241,12 +241,12 @@ transformed and simplified [with the help of this package](https://github.com/mh
   - It renames all template variables to prefix them with `tpl`
   - It simplifies structure such as `{{"son" | split "wat"}}` to `{{$var0 := split "wat" "son"}}{{$var0}}`
   - It produces a small type checker structure which registers variable and their type for each scope of the template.
-[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L348)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L361)
 8. `bootstrap-program` browses each simplified template tree, generates a go function corresponding to it.
-[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/convert.go#L75)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/convert.go#L87)
 9. `bootstrap-program` generates an `init` function to register to
 your configuration variable the new functions as their template name.
-[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L222)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L227)
 10. `bootstrap-program` writes the fully generated program.
 
 ### Working with funcmap
