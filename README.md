@@ -86,7 +86,9 @@ var compiledTemplates = compiled.New(
     compiled.TemplateConfiguration{
       HTML:          true,
       TemplatesPath: "tmpl/*.tpl",
-      Data:          TplData{},
+			TemplatesData: map[string]interface{}{
+				"*": data.MyTemplateData{},
+			},
       FuncsMap:      []string{
         "somewhere/mypackage:tplFuncs",
       },
