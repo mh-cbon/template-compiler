@@ -83,24 +83,24 @@ import (
 var compiledTemplates = compiled.New(
   "gen.go",
   []compiled.TemplateConfiguration{
-  compiled.TemplateConfiguration{
-    HTML:          true,
-    TemplatesPath: "tmpl/*.tpl",
-    TemplatesData: map[string]interface{}{
-      "*": TplData{},
+    compiled.TemplateConfiguration{
+      HTML:          true,
+      TemplatesPath: "tmpl/*.tpl",
+      TemplatesData: map[string]interface{}{
+        "*": TplData{},
+      },
+      FuncsMap:      []string{
+        "somewhere/mypackage:tplFuncs",
+      },
     },
-    FuncsMap:      []string{
-      "somewhere/mypackage:tplFuncs",
+    compiled.TemplateConfiguration{
+      TemplateName:    "notafile",
+      TemplateContent: `hello!{{define "embed"}}{{.Email}} {{.Name}}{{end}}`,
+      TemplatesData: map[string]interface{}{
+        "*": nil,
+        "embed": TplData{},
+      },
     },
-  },
-  compiled.TemplateConfiguration{
-    TemplateName:    "notafile",
-    TemplateContent: `hello!{{define "embed"}}{{.Email}} {{.Name}}{{end}}`,
-    TemplatesData: map[string]interface{}{
-      "*": nil,
-      "embed": TplData{},
-    },
-  },
   },
 )
 
@@ -213,7 +213,7 @@ with the `go:generate` comment, `go generate` also declares an environment varia
 With those hints `template-compiler` can locate and consume the variable declared with `-var` parameter.
 [We are here](https://github.com/mh-cbon/template-compiler/blob/master/main.go#L17)
 2. `template-compiler` will generate a bootstrap program.
-[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L20)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L22)
 3. The generation of the bootstrap program is about parsing, browsing, and re exporting
 an updated version of your configuration variable.
 It specifically looks for each `compiled.TemplateConfiguration{}`:
@@ -224,11 +224,11 @@ It specifically looks for each `compiled.TemplateConfiguration{}`:
   - It checks for `FuncsMap` key, and export those variable targets
     (with the help of [this package](https://github.com/mh-cbon/export-funcmap))
     to `FuncsExport` and `PublicIdents` keys.
- [We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L116)
+ [We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L118)
 4. `template-compiler` writes and compiles a go program into
 `$GOPATH/src/template-compilerxxx`.
 This program is made to compile the templates with the updated configuration.
-[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L92)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/bootstrap.go#L94)
 5. `bootstrap-program` is now invoked.
 [We are here](https://github.com/mh-cbon/template-compiler/blob/master/main.go#L72)
 6. `bootstrap-program` browses the configuration value,
