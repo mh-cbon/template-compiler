@@ -354,4 +354,4 @@ or something like `Byter`, and make use of that to get ride of some `fmt.Sprintf
 - implement cache for functions export.
 - add template.Options support (some stuff there)
 - add channel support (is it really used ? :x)
-- add a method to easily from compiled function to original templates without modifying the configuration, improts ect.
+- add a method to easily switch from compiled function to original templates without modifying the configuration, imports ect.
