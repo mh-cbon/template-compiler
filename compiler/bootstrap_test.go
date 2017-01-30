@@ -66,6 +66,34 @@ var compiled = compiled.New(
 
 import (
 	"github.com/mh-cbon/template-compiler/compiled"
+)
+
+var compiled = compiled.New(
+	"gen.go",
+	[]compiled.TemplateConfiguration{
+		compiled.TemplateConfiguration{
+			TemplatesPath: "templates/*.tpl",
+			TemplatesData: map[string]interface{}{
+				"*": nil,
+			},
+		},
+	},
+)`,
+			srcVar: `compiled`,
+			expectedImports: []string{
+				"fmt",
+				"github.com/mh-cbon/template-compiler/compiled",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
+			expectedOutPath:             "gen.go",
+			expectedLenOfTemplateConfig: 1,
+			expectedToBeHTMLTemplates:   []bool{false},
+		},
+		BootstrapTestData{
+			srcProgram: `package yy
+
+import (
+	"github.com/mh-cbon/template-compiler/compiled"
 	aliasdata "github.com/mh-cbon/template-compiler/demo/data"
 )
 

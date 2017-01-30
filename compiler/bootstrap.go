@@ -289,15 +289,25 @@ func exportFuncsMap(funcExports []string) (*ast.CompositeLit, *ast.CompositeLit,
 	return funcsMapValue, publicIdentValue, imports, nil
 }
 
+// getDataImports browses all TemplatesData keyValues and extracts related package path.
 func getDataImports(importsContext []*ast.ImportSpec, templateConf *ast.CompositeLit) []*ast.ImportSpec {
 	ret := []*ast.ImportSpec{}
 	kv := getKeyValue(templateConf, "TemplatesData")
 	if kv != nil {
 		values := kv.Value.(*ast.CompositeLit).Elts
 		for _, v := range values {
-			sel := v.(*ast.KeyValueExpr).Value.(*ast.CompositeLit).Type.(*ast.SelectorExpr)
-			dataImportSpec := getPkgPath(importsContext, sel.X.(*ast.Ident).Name)
-			ret = append(ret, dataImportSpec)
+			switch x := v.(*ast.KeyValueExpr).Value.(type) {
+			case *ast.CompositeLit:
+				sel := x.Type.(*ast.SelectorExpr)
+				dataImportSpec := getPkgPath(importsContext, sel.X.(*ast.Ident).Name)
+				ret = append(ret, dataImportSpec)
+			case *ast.Ident:
+				// assume its a nil.
+			default:
+				panic(
+					fmt.Errorf("getDataImports: Unhandled node type\n%v\n%#v\n", x, x),
+				)
+			}
 		}
 	}
 	return ret
