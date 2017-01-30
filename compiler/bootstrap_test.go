@@ -90,6 +90,42 @@ var compiled = compiled.New(
 			expectedToBeHTMLTemplates:   []bool{false},
 		},
 		BootstrapTestData{
+			/*
+			   This test using a local data type is not complete.
+			   As its a virutal go file, the pkgpath location of it,
+			   is not really possible :x
+			*/
+			srcProgram: `package yy
+
+import (
+	"github.com/mh-cbon/template-compiler/compiled"
+)
+
+var compiled = compiled.New(
+	"gen.go",
+	[]compiled.TemplateConfiguration{
+		compiled.TemplateConfiguration{
+			TemplatesPath: "templates/*.tpl",
+			TemplatesData: map[string]interface{}{
+				"*": SomeData{},
+			},
+		},
+	},
+)
+
+type SomeData struct {}
+`,
+			srcVar: `compiled`,
+			expectedImports: []string{
+				"fmt",
+				"github.com/mh-cbon/template-compiler/compiled",
+				"github.com/mh-cbon/template-compiler/compiler",
+			},
+			expectedOutPath:             "gen.go",
+			expectedLenOfTemplateConfig: 1,
+			expectedToBeHTMLTemplates:   []bool{false},
+		},
+		BootstrapTestData{
 			srcProgram: `package yy
 
 import (

@@ -3,9 +3,11 @@ package compiler
 import (
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/format"
 	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
 
 	"github.com/mh-cbon/export-funcmap/export"
@@ -298,9 +300,34 @@ func getDataImports(importsContext []*ast.ImportSpec, templateConf *ast.Composit
 		for _, v := range values {
 			switch x := v.(*ast.KeyValueExpr).Value.(type) {
 			case *ast.CompositeLit:
-				sel := x.Type.(*ast.SelectorExpr)
-				dataImportSpec := getPkgPath(importsContext, sel.X.(*ast.Ident).Name)
-				ret = append(ret, dataImportSpec)
+				// case where the data is defined as pkgName.DataType{}
+				if sel, ok := x.Type.(*ast.SelectorExpr); ok {
+					dataImportSpec := getPkgPath(importsContext, sel.X.(*ast.Ident).Name)
+					ret = append(ret, dataImportSpec)
+
+					// case where the data is defined as DataType{}
+					// this case means that the DataType is declared into the same
+					// package as the configuration.
+				} else if ident, ok := x.Type.(*ast.Ident); ok {
+					wd, _ := os.Getwd()
+					// try to detect the pkgpath of the configuration variable.
+					// that may work because the bootstrap is invoked in the directory
+					// of the configuration.
+					pkg, err := build.Default.ImportDir(wd, 0)
+					if err != nil {
+						panic(err)
+					}
+					if pkg.IsCommand() {
+						panic(
+							fmt.Errorf(
+								"Impossible to consume the datatype %v located in the main package of the GO program %v",
+								ident.Name, pkg.ImportPath,
+							),
+						)
+					}
+					dataImportSpec := export.NewImportSpec(pkg.ImportPath, "")
+					ret = append(ret, dataImportSpec)
+				}
 			case *ast.Ident:
 				// assume its a nil.
 			default:
