@@ -10,11 +10,12 @@ import (
 	aliastemplate "github.com/mh-cbon/template-compiler/std/html/template"
 )
 
+var builtin3 = []byte(" World!\n")
+var builtin4 = []byte("Hello")
+var builtin5 = []byte("hello!")
 var builtin0 = []byte("Hello from a!\n")
 var builtin1 = []byte("Hello from b!\n")
 var builtin2 = []byte("\n")
-var builtin3 = []byte(" World!\n")
-var builtin4 = []byte("Hello")
 
 
 func init () {
@@ -23,6 +24,7 @@ func init () {
   compiledTemplates.Add("c.tpl", fncTpl)
   compiledTemplates.Add("d.tpl", fndTpl)
   compiledTemplates.Add("tt", fndTplTt)
+  compiledTemplates.Add("notafile", fnnotafile)
   tpl3X0 := compiledTemplates.MustGet("d.tpl")
   tpl3Y0 := compiledTemplates.MustGet("tt")
   tpl3X0, _ = tpl3X0.Compiled(tpl3Y0)
@@ -168,6 +170,15 @@ func fndTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 func fndTplTt(t parse.Templater, w io.Writer, indata interface{}) error {
 	var writeErr error
 	_, writeErr = w.Write(builtin4)
+	if writeErr != nil {
+		return writeErr
+	}
+	return nil
+}
+
+func fnnotafile(t parse.Templater, w io.Writer, indata interface{}) error {
+	var writeErr error
+	_, writeErr = w.Write(builtin5)
 	if writeErr != nil {
 		return writeErr
 	}

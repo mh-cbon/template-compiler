@@ -11,7 +11,7 @@ import (
 	"github.com/mh-cbon/template-compiler/std/text/template/parse"
 )
 
-//go:generate template-compiler -print -var compiledTemplates
+//go:generate template-compiler -var compiledTemplates
 var compiledTemplates = compiled.New(
 	"gen.go",
 	[]compiled.TemplateConfiguration{
@@ -20,6 +20,13 @@ var compiledTemplates = compiled.New(
 			TemplatesPath: "templates/*.tpl",
 			TemplatesData: map[string]interface{}{
 				"*": data.MyTemplateData{},
+			},
+		},
+		compiled.TemplateConfiguration{
+			TemplateName:    "notafile",
+			TemplateContent: `hello!`,
+			TemplatesData: map[string]interface{}{
+				"*": nil,
 			},
 		},
 	},

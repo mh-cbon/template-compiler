@@ -93,6 +93,14 @@ var compiledTemplates = compiled.New(
         "somewhere/mypackage:tplFuncs",
       },
     },
+		compiled.TemplateConfiguration{
+			TemplateName:    "notafile",
+			TemplateContent: `hello!{{define "embed"}}{{.Email}} {{.Name}}{{end}}`,
+			TemplatesData: map[string]interface{}{
+				"*": nil,
+				"embed": data.MyTemplateData{},
+			},
+		},
   },
 )
 
@@ -107,6 +115,8 @@ type TplData struct {
 
 func handler(w http.ResponseWriter, r *http.Request) {
     compiledTemplates.MustGet("welcome.tpl").Execute(w, TplData{})
+    compiledTemplates.MustGet("notafile").Execute(w, nil)
+    compiledTemplates.MustGet("embed").Execute(w, TplData{})
 }
 ```
 
@@ -160,6 +170,7 @@ func fnaTplaTpl0(t parse.Templater, w io.Writer, indata interface {
 }
 var builtin0 = []byte(" ")
 
+// more like this
 ```
 
 ### What would be the performance improvements ?
@@ -341,3 +352,6 @@ or something like `Byter`, and make use of that to get ride of some `fmt.Sprintf
 - consolidate additions to std `text/template`/`html/template` packages.
 - version releases.
 - implement cache for functions export.
+- add template.Options support (some stuff there)
+- add channel support (is it really used ? :x)
+- add a method to easily from compiled function to original templates without modifying the configuration, improts ect.
