@@ -8,15 +8,22 @@ import (
 	aliasdata "github.com/mh-cbon/template-compiler/demo/data"
 	"text/template"
 	aliastemplate "github.com/mh-cbon/template-compiler/std/html/template"
+	aliastemplate1 "html/template"
 	"fmt"
 )
 
-var builtin0 = []byte("Hello from a!\n")
-var builtin1 = []byte("Hello from b!\n")
+var builtin11 = []byte("hello!")
 var builtin2 = []byte("\n")
 var builtin3 = []byte(" World!\n")
 var builtin4 = []byte("Hello")
-var builtin5 = []byte("hello!")
+var builtin6 = []byte("\n  <ul>\n  ")
+var builtin8 = []byte("</li>\n  ")
+var builtin9 = []byte("\n  </ul>\n")
+var builtin10 = []byte("\nNo items!\n")
+var builtin0 = []byte("Hello from a!\n")
+var builtin1 = []byte("Hello from b!\n")
+var builtin5 = []byte("This is a template!\n\n")
+var builtin7 = []byte("\n    <li>")
 
 
 func init () {
@@ -25,6 +32,8 @@ func init () {
   compiledTemplates.Add("c.tpl", fncTpl)
   compiledTemplates.Add("d.tpl", fndTpl)
   compiledTemplates.Add("tt", fndTplTt)
+  compiledTemplates.Add("e.tpl", fneTpl)
+  compiledTemplates.Add("f.tpl", fnfTpl)
   compiledTemplates.Add("embed", fnnotafileEmbed)
   compiledTemplates.Add("notafile", fnnotafile)
   tpl3X0 := compiledTemplates.MustGet("d.tpl")
@@ -85,7 +94,7 @@ func fncTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 	if writeErr != nil {
 		return writeErr
 	}
-	var var1 string = aliastemplate.HTMLEscaper(tplA)
+	var var1 string = aliastemplate1.HTMLEscapeString(tplA)
 	_, writeErr = io.WriteString(w, var1)
 	if writeErr != nil {
 		return writeErr
@@ -94,7 +103,7 @@ func fncTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 	if writeErr != nil {
 		return writeErr
 	}
-	var var2 string = aliastemplate.HTMLEscaper(tplY)
+	var var2 string = aliastemplate1.HTMLEscapeString(tplY)
 	_, writeErr = io.WriteString(w, var2)
 	if writeErr != nil {
 		return writeErr
@@ -103,7 +112,7 @@ func fncTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 	if writeErr != nil {
 		return writeErr
 	}
-	var var3 string = aliastemplate.HTMLEscaper(data.Some)
+	var var3 string = aliastemplate1.HTMLEscapeString(data.Some)
 	_, writeErr = io.WriteString(w, var3)
 	if writeErr != nil {
 		return writeErr
@@ -117,7 +126,7 @@ func fncTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 	if writeErr != nil {
 		return writeErr
 	}
-	var var4 string = aliastemplate.HTMLEscaper(data.Some)
+	var var4 string = aliastemplate1.HTMLEscapeString(data.Some)
 	_, writeErr = io.WriteString(w, var4)
 	if writeErr != nil {
 		return writeErr
@@ -126,7 +135,7 @@ func fncTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 	if writeErr != nil {
 		return writeErr
 	}
-	var var5 string = aliastemplate.HTMLEscaper(data.Some)
+	var var5 string = aliastemplate1.HTMLEscapeString(data.Some)
 	_, writeErr = io.WriteString(w, var5)
 	if writeErr != nil {
 		return writeErr
@@ -135,7 +144,7 @@ func fncTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 	if writeErr != nil {
 		return writeErr
 	}
-	var var6 string = aliastemplate.HTMLEscaper(data.Some)
+	var var6 string = aliastemplate1.HTMLEscapeString(data.Some)
 	_, writeErr = io.WriteString(w, var6)
 	if writeErr != nil {
 		return writeErr
@@ -144,7 +153,7 @@ func fncTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 	if writeErr != nil {
 		return writeErr
 	}
-	var var7 string = aliastemplate.HTMLEscaper(tplP)
+	var var7 string = aliastemplate1.HTMLEscapeString(tplP)
 	_, writeErr = io.WriteString(w, var7)
 	if writeErr != nil {
 		return writeErr
@@ -182,6 +191,106 @@ func fndTplTt(t parse.Templater, w io.Writer, indata interface{}) error {
 	return nil
 }
 
+func fneTpl(t parse.Templater, w io.Writer, indata interface{}) error {
+	var data aliasdata.MyTemplateData
+	if d, ok := indata.(aliasdata.MyTemplateData); ok {
+		data = d
+	}
+	var writeErr error
+	_, writeErr = w.Write(builtin5)
+	if writeErr != nil {
+		return writeErr
+	}
+	var var1 int = len(data.Items)
+	var var0 bool = 0 != var1
+	if var0 {
+		_, writeErr = w.Write(builtin6)
+		if writeErr != nil {
+			return writeErr
+		}
+		var var2 []string = data.Items
+		for _, iterable := range var2 {
+			_, writeErr = w.Write(builtin7)
+			if writeErr != nil {
+				return writeErr
+			}
+			var var3 string = aliastemplate1.HTMLEscapeString(iterable)
+			_, writeErr = io.WriteString(w, var3)
+			if writeErr != nil {
+				return writeErr
+			}
+			_, writeErr = w.Write(builtin8)
+			if writeErr != nil {
+				return writeErr
+			}
+		}
+		_, writeErr = w.Write(builtin9)
+		if writeErr != nil {
+			return writeErr
+		}
+	} else {
+		_, writeErr = w.Write(builtin10)
+		if writeErr != nil {
+			return writeErr
+		}
+	}
+	_, writeErr = w.Write(builtin2)
+	if writeErr != nil {
+		return writeErr
+	}
+	return nil
+}
+
+func fnfTpl(t parse.Templater, w io.Writer, indata interface{}) error {
+	var data aliasdata.MyTemplateData
+	if d, ok := indata.(aliasdata.MyTemplateData); ok {
+		data = d
+	}
+	var writeErr error
+	_, writeErr = w.Write(builtin5)
+	if writeErr != nil {
+		return writeErr
+	}
+	var var1 int = len(data.MethodItems())
+	var var0 bool = 0 != var1
+	if var0 {
+		_, writeErr = w.Write(builtin6)
+		if writeErr != nil {
+			return writeErr
+		}
+		var var2 []string = data.MethodItems()
+		for _, iterable := range var2 {
+			_, writeErr = w.Write(builtin7)
+			if writeErr != nil {
+				return writeErr
+			}
+			var var3 string = aliastemplate1.HTMLEscapeString(iterable)
+			_, writeErr = io.WriteString(w, var3)
+			if writeErr != nil {
+				return writeErr
+			}
+			_, writeErr = w.Write(builtin8)
+			if writeErr != nil {
+				return writeErr
+			}
+		}
+		_, writeErr = w.Write(builtin9)
+		if writeErr != nil {
+			return writeErr
+		}
+	} else {
+		_, writeErr = w.Write(builtin10)
+		if writeErr != nil {
+			return writeErr
+		}
+	}
+	_, writeErr = w.Write(builtin2)
+	if writeErr != nil {
+		return writeErr
+	}
+	return nil
+}
+
 func fnnotafileEmbed(t parse.Templater, w io.Writer, indata interface{}) error {
 	var data aliasdata.MyTemplateData
 	if d, ok := indata.(aliasdata.MyTemplateData); ok {
@@ -197,7 +306,7 @@ func fnnotafileEmbed(t parse.Templater, w io.Writer, indata interface{}) error {
 
 func fnnotafile(t parse.Templater, w io.Writer, indata interface{}) error {
 	var writeErr error
-	_, writeErr = w.Write(builtin5)
+	_, writeErr = w.Write(builtin11)
 	if writeErr != nil {
 		return writeErr
 	}
