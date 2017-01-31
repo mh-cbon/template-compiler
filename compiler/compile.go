@@ -162,12 +162,23 @@ func (c *CompiledTemplatesProgram) addImport(pkgpath string) string {
 		Path: &ast.BasicLit{Value: qpath},
 	}
 	c.imports = append(c.imports, newImport)
-	if c.isCollidingIdent(bpath) {
-		bpath = "alias" + bpath
-		newImport.Name = &ast.Ident{Name: bpath}
+	duplicated := false
+	i := 0
+	okAlias := bpath
+	for c.isCollidingIdent(okAlias) {
+		if i == 0 {
+			okAlias = "alias" + bpath
+		} else {
+			okAlias = fmt.Sprintf("alias%v%v", bpath, i)
+		}
+		i++
+		duplicated = true
 	}
-	c.idents = append(c.idents, bpath)
-	return bpath
+	if duplicated {
+		newImport.Name = &ast.Ident{Name: okAlias}
+	}
+	c.idents = append(c.idents, okAlias)
+	return okAlias
 }
 
 // isCollidingIdent tells if given ident will collide exisiting idents.
