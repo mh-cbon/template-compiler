@@ -175,28 +175,35 @@ var builtin0 = []byte(" ")
 
 ### What would be the performance improvements ?
 
-Given the templates available [here](https://github.com/mh-cbon/template-compiler/tree/master/demo/templates)
+Given the templates compiled as HTML
+available [here](https://github.com/mh-cbon/template-compiler/tree/master/demo/templates)
 
 ```sh
-$ go test -bench=.
+  $ go test -bench=. -benchmem
+  BenchmarkRenderWithCompiledTemplateA-4   	20000000	        88.0 ns/op	      48 B/op	       1 allocs/op
+  BenchmarkRenderWithJitTemplateA-4        	 3000000	       442 ns/op	      96 B/op	       2 allocs/op
+  BenchmarkRenderWithCompiledTemplateB-4   	20000000	        87.9 ns/op	      48 B/op	       1 allocs/op
+  BenchmarkRenderWithJitTemplateB-4        	 3000000	       442 ns/op	      96 B/op	       2 allocs/op
+  Print string: x6
 
-a.tpl
-BenchmarkRenderWithCompiledTemplate-4    	100000000	        10.5 ns/op
-BenchmarkRenderWithJitTemplate-4         	 5000000	       384 ns/op
-                                          x20 times faster.
+  BenchmarkRenderWithCompiledTemplateC-4   	  500000	      3288 ns/op	      80 B/op	       5 allocs/op
+  BenchmarkRenderWithJitTemplateC-4        	   50000	     25144 ns/op	    3352 B/op	      76 allocs/op
+  Print various data types: x10
 
-c.tpl
-BenchmarkRenderWithCompiledTemplateC-4   	 2000000	       641 ns/op
-BenchmarkRenderWithJitTemplateC-4        	  100000	     18064 ns/op
-                                          x20 times faster.
+  BenchmarkRenderWithCompiledTemplateD-4   	10000000	       121 ns/op	      48 B/op	       1 allocs/op
+  BenchmarkRenderWithJitTemplateD-4        	 2000000	       593 ns/op	     144 B/op	       3 allocs/op
+  Use multiple templates: x5
 
-d.tpl
-BenchmarkRenderWithCompiledTemplateD-4   	50000000	        34.5 ns/op
-BenchmarkRenderWithJitTemplateD-4        	 3000000	       478 ns/op
-                                          x16 times faster.
+  BenchmarkRenderWithCompiledTemplateE-4   	  300000	      5041 ns/op	      48 B/op	       1 allocs/op
+  BenchmarkRenderWithJitTemplateE-4        	   30000	     50306 ns/op	    6970 B/op	     191 allocs/op
+  Range, if, funcs: x10
 
-PASS
-ok  	github.com/mh-cbon/template-compiler/demo	10.993s
+  BenchmarkRenderWithCompiledTemplateF-4   	 5000000	       372 ns/op	      48 B/op	       1 allocs/op
+  BenchmarkRenderWithJitTemplateF-4        	  100000	     17643 ns/op	    2248 B/op	      61 allocs/op
+  Method call: x50
+
+  PASS
+  ok  	github.com/mh-cbon/template-compiler/demo	21.431s
 ```
 
 Generally speaking the more complex the template is,
