@@ -7,6 +7,7 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
+	html "html/template"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -15,6 +16,26 @@ import (
 	"github.com/mh-cbon/template-compiler/compiled"
 	"github.com/mh-cbon/template-tree-simplifier/simplifier"
 )
+
+//-
+type opitmizedFunc struct {
+	PkgPath string
+	Name    string
+	Type    reflect.Type
+}
+
+var optimizedCalls = map[string]opitmizedFunc{
+	"_html_template_htmlescaper": opitmizedFunc{
+		PkgPath: "html/template",
+		Name:    "HTMLEscapeString",
+		Type:    reflect.TypeOf(html.HTMLEscapeString),
+	},
+	"html": opitmizedFunc{
+		PkgPath: "html/template",
+		Name:    "HTMLEscapeString",
+		Type:    reflect.TypeOf(html.HTMLEscapeString),
+	},
+}
 
 // converter holds data to convert a template tree into a function.
 type converter struct {
@@ -247,7 +268,7 @@ func (c *converter) handleActionNode(node *parse.ActionNode, typeCheck *simplifi
 		expr := c.handleCommandNode(node.Pipe.Cmds[0], typeCheck)
 		ret = c.makeIoWrite(astNodeToString(expr), t)
 
-	} else if len(node.Pipe.Cmds) == 1 { // likely a simple assignment $z := 4
+	} else if len(node.Pipe.Cmds) == 1 { // likely a simple assignment $z := 4.
 		// this case could go into the next one, it would produce an assignement (:=)
 		// but this case is designed spcifically to produce var declaration with its type.
 		expr := c.handleCommandNode(node.Pipe.Cmds[0], typeCheck)
@@ -451,7 +472,20 @@ func (c *converter) handleCommandNode(node *parse.CommandNode, typeCheck *simpli
 		// if it s a eq (bool, bool), transforms it to bool==bool,
 		// etc etc. quiet important.
 		case *parse.IdentifierNode:
-			fnCall = c.convertIdentifierNode(x).(*ast.ExprStmt).X.(*ast.CallExpr)
+			y := c.optimizedIdentifierCall(node, typeCheck)
+			if y == nil {
+				// was not optimized, move on to regular call
+				fnCall = c.convertIdentifierNode(x).(*ast.ExprStmt).X.(*ast.CallExpr)
+			} else {
+				// y might be either
+				// - a func call missing its arguments
+				// - a binary expr (z==e)
+				// latter case should be returned immediately.
+				if _, ok := y.(*ast.ExprStmt).X.(*ast.BinaryExpr); ok {
+					return y.(*ast.ExprStmt).X
+				}
+				fnCall = y.(*ast.ExprStmt).X.(*ast.CallExpr)
+			}
 
 		case *parse.FieldNode:
 			fnCall = c.convertFieldNodeMethod(x, typeCheck).(*ast.CallExpr)
@@ -483,13 +517,21 @@ func (c *converter) handleCommandNode(node *parse.CommandNode, typeCheck *simpli
 }
 
 // Identify and returns the value type of the command node.
+func (c *converter) getTypesOfCommandNode(node *parse.CommandNode, typeCheck *simplifier.State) (reflect.Type, []reflect.Type) {
+	if y, u := c.getTypesOfOptimizedNode(node, typeCheck); y != nil {
+		return y, u
+	}
+	return c.getTypesOfSomeNode(node.Args[0], typeCheck)
+}
+
+// Identify and returns the value type of the a node.
 // If the command node matches a func/method call,
 // the first output value type is available in ret,
 // all others output values goes into out[].
-func (c *converter) getTypesOfCommandNode(node *parse.CommandNode, typeCheck *simplifier.State) (reflect.Type, []reflect.Type) {
+func (c *converter) getTypesOfSomeNode(node parse.Node, typeCheck *simplifier.State) (reflect.Type, []reflect.Type) {
 	var ret reflect.Type
 	out := []reflect.Type{}
-	switch x := node.Args[0].(type) {
+	switch x := node.(type) {
 	case *parse.FieldNode:
 		y := typeCheck.Dot()
 
@@ -597,6 +639,161 @@ func isHexConstant(s string) bool {
 }
 
 // copied from template/exec.go?#L478
+
+// returns an optimized version of an identifier call.
+func (c *converter) optimizedIdentifierCall(node *parse.CommandNode, typeCheck *simplifier.State) ast.Stmt {
+	ident := node.Args[0].(*parse.IdentifierNode) // that is for sure.
+
+	if f, ok := optimizedCalls[ident.Ident]; ok {
+		// there may be something to do.
+		if c.commandNodeMatchesFuncCall(f.Type, node, typeCheck) {
+			alias := c.compiledProgram.addImport(f.PkgPath)
+			return getStmtsAst(`` + alias + `.` + f.Name + `()`)[0]
+		}
+	}
+
+	if ident.Ident == "len" {
+		if len(node.Args)-1 == 1 {
+			argType, argOut := c.getTypesOfSomeNode(node.Args[1], typeCheck)
+			if len(argOut) > 0 {
+				return nil // optimizable, later.
+			}
+			if argType.Kind() == reflect.Ptr {
+				argType = argType.Elem()
+			}
+			if argType.Kind() != reflect.Array &&
+				argType.Kind() != reflect.Slice &&
+				argType.Kind() != reflect.String &&
+				argType.Kind() != reflect.Chan {
+				return nil // unlikely.
+			}
+			// all correct.
+			lenStmt := getStmtsAst(`len(x)`)[0]
+			// remove x variable.
+			lenStmt.(*ast.ExprStmt).X.(*ast.CallExpr).Args = make([]ast.Expr, 0)
+			return lenStmt
+		}
+	}
+
+	if ident.Ident == "eq" ||
+		ident.Ident == "ne" ||
+		ident.Ident == "ge" ||
+		ident.Ident == "gt" ||
+		ident.Ident == "le" ||
+		ident.Ident == "lt" {
+		firstArg, _ := c.getTypesOfSomeNode(node.Args[1], typeCheck)
+		for _, a := range node.Args[2:] {
+			xArg, _ := c.getTypesOfSomeNode(a, typeCheck)
+			if xArg.Kind() != firstArg.Kind() {
+				return nil // inconsistence type checking, to improve later ?
+			}
+		}
+		tok := token.EQL
+		switch ident.Ident {
+		case "ne":
+			tok = token.NEQ
+		case "ge":
+			tok = token.GEQ
+		case "gt":
+			tok = token.GTR
+		case "le":
+			tok = token.LEQ
+		case "lt":
+			tok = token.LSS
+		}
+		//seems good.
+		var bTest *ast.BinaryExpr
+		for i := 1; i < len(node.Args); i += 2 {
+			if bTest == nil {
+				leftexpr := c.convertNode(node.Args[i], typeCheck)
+				rightexpr := c.convertNode(node.Args[i+1], typeCheck)
+				bTest = &ast.BinaryExpr{
+					X:  leftexpr,
+					Op: tok,
+					Y:  rightexpr,
+				}
+			} else {
+				leftexpr := c.convertNode(node.Args[i], typeCheck)
+				bTest = &ast.BinaryExpr{
+					X:  bTest,
+					Op: tok,
+					Y:  leftexpr,
+				}
+				if len(node.Args) > i+1 {
+					rightexpr := c.convertNode(node.Args[i+1], typeCheck)
+					bTest = &ast.BinaryExpr{
+						X:  bTest,
+						Op: tok,
+						Y:  rightexpr,
+					}
+				}
+			}
+		}
+		return &ast.ExprStmt{X: bTest}
+	}
+	//-
+
+	// fmt.Printf("%#v\n", ident)
+	// fmt.Printf("%#v\n", fnCall.Fun.(*ast.SelectorExpr).X)
+	// fmt.Printf("%#v\n", fnCall.Fun.(*ast.SelectorExpr).Sel)
+	// panic("r")
+
+	return nil
+}
+
+// returns appropriate types for an optimized call, which is a bit tricky :x.
+func (c *converter) getTypesOfOptimizedNode(node *parse.CommandNode, typeCheck *simplifier.State) (reflect.Type, []reflect.Type) {
+	if len(node.Args) > 0 {
+		if ident, ok := node.Args[0].(*parse.IdentifierNode); ok {
+			if ident.Ident == "len" {
+				return reflect.TypeOf(1), []reflect.Type{}
+			}
+			if ident.Ident == "eq" ||
+				ident.Ident == "ne" ||
+				ident.Ident == "ge" ||
+				ident.Ident == "gt" ||
+				ident.Ident == "le" ||
+				ident.Ident == "lt" {
+				firstArg, _ := c.getTypesOfSomeNode(node.Args[1], typeCheck)
+				for _, a := range node.Args[2:] {
+					xArg, _ := c.getTypesOfSomeNode(a, typeCheck)
+					if xArg.Kind() != firstArg.Kind() {
+						return nil, nil
+					}
+				}
+				// semms good.
+				return reflect.TypeOf(true), []reflect.Type{}
+			}
+			if f, ok := optimizedCalls[ident.Ident]; ok {
+				if c.commandNodeMatchesFuncCall(f.Type, node, typeCheck) {
+					var outs []reflect.Type
+					for i := 0; i < f.Type.NumOut(); i++ {
+						outs = append(outs, f.Type.Out(i))
+					}
+					return outs[0], outs[1:]
+				}
+			}
+		}
+	}
+	return nil, nil
+}
+
+// tells if a command node matches a function signature.
+func (c *converter) commandNodeMatchesFuncCall(fn reflect.Type, node *parse.CommandNode, typeCheck *simplifier.State) bool {
+	if fn.NumIn() != len(node.Args)-1 {
+		return false
+	}
+	for i := 0; i < fn.NumIn(); i++ {
+		argType, argOut := c.getTypesOfSomeNode(node.Args[i+1], typeCheck)
+		if len(argOut) > 0 {
+			return false // not sure yet what to do here.
+		}
+		if argType.Kind() != fn.In(i).Kind() {
+			return false
+		}
+	}
+	return true
+}
 
 // creates a binary expression such as a == b, for example.
 func (c *converter) makeBinaryTest(expr ast.Expr, exprType reflect.Type) ast.Expr {

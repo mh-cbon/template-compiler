@@ -1199,7 +1199,7 @@ Hello without branch!
 			dataValue: TemplateData{SomeInterface: TemplateData{}},
 			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var writeErr error
-  var var0 string = template.HTMLEscaper("rr")
+  var var0 string = template.HTMLEscapeString("rr")
   _, writeErr = io.WriteString(w, var0)
   if writeErr != nil {
     return writeErr
@@ -1214,7 +1214,69 @@ Hello without branch!
 			expectImports: []string{
 				"io",
 				"github.com/mh-cbon/template-compiler/std/text/template/parse",
-				"text/template",
+				"html/template",
+			},
+			funcsMapPublic: []map[string]string{
+				map[string]string{
+					"FuncName": "html",
+					"Sel":      "template.HTMLEscaper",
+					"Pkg":      "text/template",
+				},
+			},
+		},
+		TestData{
+			tplstr:    `{{len .SomeTemplateDataSlice}}`,
+			dataValue: TemplateData{},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface{}) error {
+  var data compiler.TemplateData
+  if d, ok := indata.(compiler.TemplateData); ok {
+    data = d
+  }
+  var writeErr error
+  var var0 []*compiler.TemplateData = data.SomeTemplateDataSlice
+  var var1 int = len(var0)
+  _, writeErr = io.WriteString(w, strconv.Itoa(var1))
+  if writeErr != nil {
+    return writeErr
+  }
+  return nil
+}`,
+			expectBuiltins: map[string]string{},
+			funcs: map[string]interface{}{
+				"browsePropertyPath": func(x interface{}, p string, args ...interface{}) interface{} { return nil },
+				"len":                func(item interface{}) (int, error) { return 0, nil },
+			},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+				"strconv",
+			},
+			funcsMapPublic: []map[string]string{
+				map[string]string{
+					"FuncName": "html",
+					"Sel":      "template.HTMLEscaper",
+					"Pkg":      "text/template",
+				},
+			},
+		},
+		TestData{
+			tplstr:    `{{if eq true true}}{{end}}`,
+			dataValue: TemplateData{},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface{}) error {
+  var var0 bool = true == true
+  if var0 {
+  }
+  return nil
+}`,
+			expectBuiltins: map[string]string{},
+			funcs: map[string]interface{}{
+				"browsePropertyPath": func(x interface{}, p string, args ...interface{}) interface{} { return nil },
+				"eq":                 func(arg1 interface{}, arg2 ...interface{}) (bool, error) { return false, nil },
+			},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
 			},
 			funcsMapPublic: []map[string]string{
 				map[string]string{

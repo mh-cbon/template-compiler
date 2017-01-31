@@ -1,6 +1,6 @@
 # template-compiler
 
-Compile your `text/template` / `html/template` to regular go code.
+Compile `text/template` / `html/template` to regular go code.
 
 still a wip!
 
@@ -338,14 +338,14 @@ It also delcares all escapers to a public function to improve performance of com
 
 Here are some optimizations/todos to implement later:
 
-- When compiling templates, funcs like `_html_template_htmlescaper` will translate to `template.HTMLEscaper`.
+- ~~When compiling templates, funcs like `_html_template_htmlescaper` will translate to `template.HTMLEscaper`.
 It worth to note that many cases are probably `template.HTMLEscaper(string)`, but `template.HTMLEscaper` is doing
 some extra job to type check this `string` value.
-An optimization is to detect those calls `template.HTMLEscaper(string)` and transformedform them to `template.HTMLEscapeString(string)`
+An optimization is to detect those calls `template.HTMLEscaper(string)` and transformedform them to `template.HTMLEscapeString(string)`~~
 - Same as previous for most escaper functions of `html/template`
-- Detect template calls such `eq(bool, bool)`, or `neq(int, int)` and transform them to an
+- Detect template calls such ~~`eq(bool, bool)`~~, or `neq(int, int)` and transform them to an
 appropriate go binary test `bool == bool`, ect.
-- Detect templates calls such `len(some)` and transforms it to the builtin `len` function.
+- ~~Detect templates calls such `len(some)` and transforms it to the builtin `len` function.~~
 - Detect prints of `struct` or `*struct`, check if they implements `Stringer`,
 or something like `Byter`, and make use of that to get ride of some `fmt.Sprintf` calls.
 - review the install procedure, i suspect it is not yet correct. Make use of glide.
