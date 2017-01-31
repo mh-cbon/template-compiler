@@ -340,6 +340,33 @@ func TestConvert(t *testing.T) {
 			},
 		},
 		TestData{
+			tplstr:    `{{range .SomeByteSlice}}{{.}}{{end}}`,
+			dataValue: TemplateData{SomeString: "Hello!"},
+			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface{}) error {
+  var data compiler.TemplateData
+  if d, ok := indata.(compiler.TemplateData); ok {
+    data = d
+  }
+  var writeErr error
+  var var0 []uint8 = data.SomeByteSlice
+  for _, iterable := range var0 {
+    _, writeErr = io.WriteString(w, strconv.FormatUint(iterable, 10))
+    if writeErr != nil {
+      return writeErr
+    }
+  }
+  return nil
+}`,
+			expectBuiltins: map[string]string{},
+			funcs:          map[string]interface{}{},
+			expectImports: []string{
+				"io",
+				"github.com/mh-cbon/template-compiler/std/text/template/parse",
+				"github.com/mh-cbon/template-compiler/compiler",
+				"strconv",
+			},
+		},
+		TestData{
 			tplstr:    `{{range $i, $v := .SomeByteSlice}}{{.}}{{end}}`,
 			dataValue: TemplateData{SomeString: "Hello!"},
 			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {

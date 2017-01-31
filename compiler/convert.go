@@ -44,6 +44,7 @@ type converter struct {
 	fn              *ast.FuncDecl
 	state           *state
 	errvars         int
+	itervars        int
 	compiledProgram *CompiledTemplatesProgram
 	funcsMap        map[string]interface{}
 	publicIdents    []map[string]string
@@ -56,6 +57,15 @@ func (c *converter) createErrVars() string {
 		return "err"
 	}
 	return fmt.Sprintf("err%v", c.errvars)
+}
+
+// createErrVars creates a unique error var name for a fucntion scope.
+func (c *converter) createIterableVars() string {
+	if c.itervars == 0 {
+		return "iterable"
+	}
+	c.itervars++
+	return fmt.Sprintf("iterable%v", c.itervars)
 }
 
 // state is a struct to navigate into functions of a go code.
@@ -391,7 +401,10 @@ func (c *converter) handleRangeNode(node *parse.RangeNode, typeCheck *simplifier
 		dotVarName = decl[1].Ident[0][1:]
 
 	} else {
-		dotVarName = c.state.dotVar()
+		dotVarName = c.createIterableVars()
+		fakeTempVar := &parse.VariableNode{Ident: []string{"$" + dotVarName}}
+		ret.Value = c.convertNode(fakeTempVar, typeCheck)
+		ret.Key = &ast.Ident{Name: "_"}
 	}
 	ret.X = c.convertNode(node.BranchNode.Pipe.Cmds[0].Args[0], typeCheck)
 
