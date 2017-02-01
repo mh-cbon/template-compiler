@@ -81,15 +81,12 @@ yy.Add("b.tpl", fnbTpl)
   if d, ok := indata.(aliasdata.MyTemplateData); ok {
     data = d
   }
-  var writeErr error
   var tplY int = 4
-  _, writeErr = io.WriteString(w, strconv.Itoa(tplY))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.Itoa(tplY)); werr != nil {
+    return werr
   }
-  _, writeErr = fmt.Fprintf(w, "%v", data)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := fmt.Fprintf(w, "%v", data); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -117,24 +114,19 @@ yy.Add("b.tpl", fnbTpl)
 }`,
 			expectedTplsFunc: map[string]string{
 				"fnbTpl": `func fnbTpl(t parse.Templater, w io.Writer, indata interface{}) error {
-  var writeErr error
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var tplY int = 4
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var0 string = template.HTMLEscaper(tplY)
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var0); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -170,17 +162,14 @@ yy.Add("b.tpl", fnbTpl)
   if d, ok := indata.(*aliasdata.MyTemplateData); ok {
     data = d
   }
-  var writeErr error
   var tplY bool = true
   var var0 string = template.HTMLEscaper(tplY)
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var0); werr != nil {
+    return werr
   }
   var var1 string = template.HTMLEscaper(data)
-  _, writeErr = io.WriteString(w, var1)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var1); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -213,18 +202,14 @@ yy.Add("b.tpl", fnbTpl)
 }`,
 			expectedTplsFunc: map[string]string{
 				"fnbTpl": `func fnbTpl(t parse.Templater, w io.Writer, indata interface{}) error {
-  var writeErr error
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   return nil
 }`,
 				"fnbTplZ": `func fnbTplZ(t parse.Templater, w io.Writer, indata interface{}) error {
-  var writeErr error
-  _, writeErr = w.Write(builtin1)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin1); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -273,34 +258,26 @@ yy.Add("b.tpl", fnbTpl)
 }`,
 			expectedTplsFunc: map[string]string{
 				"fnbTpl": `func fnbTpl(t parse.Templater, w io.Writer, indata interface{}) error {
-  var writeErr error
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   return nil
 }`,
 				"fnbTplZ": `func fnbTplZ(t parse.Templater, w io.Writer, indata interface{}) error {
-  var writeErr error
-  _, writeErr = w.Write(builtin1)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin1); werr != nil {
+    return werr
   }
   return nil
 }`,
 				"fn0fnbTpl": `func fn0fnbTpl(t parse.Templater, w io.Writer, indata interface{}) error {
-  var writeErr error
-  _, writeErr = w.Write(builtin2)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin2); werr != nil {
+    return werr
   }
   return nil
 }`,
 				"fnbTplX": `func fnbTplX(t parse.Templater, w io.Writer, indata interface{}) error {
-  var writeErr error
-  _, writeErr = w.Write(builtin3)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin3); werr != nil {
+    return werr
   }
   return nil
 }`,

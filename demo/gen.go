@@ -3,63 +3,58 @@ package main
 //golint:ignore
 
 import (
-	"io"
-	"github.com/mh-cbon/template-compiler/std/text/template/parse"
-	aliasdata "github.com/mh-cbon/template-compiler/demo/data"
-	"text/template"
-	aliastemplate "github.com/mh-cbon/template-compiler/std/html/template"
-	aliastemplate1 "html/template"
 	"fmt"
+	"io"
+	"text/template"
+
+	aliasdata "github.com/mh-cbon/template-compiler/demo/data"
+	aliastemplate "github.com/mh-cbon/template-compiler/std/html/template"
+	"github.com/mh-cbon/template-compiler/std/text/template/parse"
 )
 
-var builtin11 = []byte("hello!")
+var builtin10 = []byte("\nNo items!\n")
+var builtin1 = []byte("Hello from b!\n")
 var builtin2 = []byte("\n")
 var builtin3 = []byte(" World!\n")
 var builtin4 = []byte("Hello")
 var builtin6 = []byte("\n  <ul>\n  ")
-var builtin8 = []byte("</li>\n  ")
-var builtin9 = []byte("\n  </ul>\n")
-var builtin10 = []byte("\nNo items!\n")
-var builtin0 = []byte("Hello from a!\n")
-var builtin1 = []byte("Hello from b!\n")
-var builtin5 = []byte("This is a template!\n\n")
 var builtin7 = []byte("\n    <li>")
+var builtin9 = []byte("\n  </ul>\n")
+var builtin11 = []byte("hello!")
+var builtin0 = []byte("Hello from a!\n")
+var builtin5 = []byte("This is a template!\n\n")
+var builtin8 = []byte("</li>\n  ")
 
-
-func init () {
-  compiledTemplates.Add("a.tpl", fnaTpl)
-  compiledTemplates.Add("b.tpl", fnbTpl)
-  compiledTemplates.Add("c.tpl", fncTpl)
-  compiledTemplates.Add("d.tpl", fndTpl)
-  compiledTemplates.Add("tt", fndTplTt)
-  compiledTemplates.Add("e.tpl", fneTpl)
-  compiledTemplates.Add("f.tpl", fnfTpl)
-  compiledTemplates.Add("embed", fnnotafileEmbed)
-  compiledTemplates.Add("notafile", fnnotafile)
-  tpl3X0 := compiledTemplates.MustGet("d.tpl")
-  tpl3Y0 := compiledTemplates.MustGet("tt")
-  tpl3X0, _ = tpl3X0.Compiled(tpl3Y0)
-  compiledTemplates.Set("d.tpl", tpl3X0)
-  tpl0X0 := compiledTemplates.MustGet("notafile")
-  tpl0Y0 := compiledTemplates.MustGet("embed")
-  tpl0X0, _ = tpl0X0.Compiled(tpl0Y0)
-  compiledTemplates.Set("notafile", tpl0X0)
+func init() {
+	compiledTemplates.Add("a.tpl", fnaTpl)
+	compiledTemplates.Add("b.tpl", fnbTpl)
+	compiledTemplates.Add("c.tpl", fncTpl)
+	compiledTemplates.Add("d.tpl", fndTpl)
+	compiledTemplates.Add("tt", fndTplTt)
+	compiledTemplates.Add("e.tpl", fneTpl)
+	compiledTemplates.Add("f.tpl", fnfTpl)
+	compiledTemplates.Add("embed", fnnotafileEmbed)
+	compiledTemplates.Add("notafile", fnnotafile)
+	tpl3X0 := compiledTemplates.MustGet("d.tpl")
+	tpl3Y0 := compiledTemplates.MustGet("tt")
+	tpl3X0, _ = tpl3X0.Compiled(tpl3Y0)
+	compiledTemplates.Set("d.tpl", tpl3X0)
+	tpl0X0 := compiledTemplates.MustGet("notafile")
+	tpl0Y0 := compiledTemplates.MustGet("embed")
+	tpl0X0, _ = tpl0X0.Compiled(tpl0Y0)
+	compiledTemplates.Set("notafile", tpl0X0)
 }
 
 func fnaTpl(t parse.Templater, w io.Writer, indata interface{}) error {
-	var writeErr error
-	_, writeErr = w.Write(builtin0)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin0); werr != nil {
+		return werr
 	}
 	return nil
 }
 
 func fnbTpl(t parse.Templater, w io.Writer, indata interface{}) error {
-	var writeErr error
-	_, writeErr = w.Write(builtin1)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin1); werr != nil {
+		return werr
 	}
 	return nil
 }
@@ -69,124 +64,76 @@ func fncTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 	if d, ok := indata.(aliasdata.MyTemplateData); ok {
 		data = d
 	}
-	var writeErr error
 	var tplZ int = 4
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
 	var tplA string = template.HTMLEscaper(tplZ)
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
 	var tplY string = data.Some
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
 	var var0 string = aliastemplate.HTMLEscaper(tplZ)
-	_, writeErr = io.WriteString(w, var0)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := io.WriteString(w, var0); werr != nil {
+		return werr
 	}
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
-	var var1 string = aliastemplate1.HTMLEscapeString(tplA)
-	_, writeErr = io.WriteString(w, var1)
-	if writeErr != nil {
-		return writeErr
+	template.HTMLEscape(w, []byte(tplA))
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
+	template.HTMLEscape(w, []byte(tplY))
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
-	var var2 string = aliastemplate1.HTMLEscapeString(tplY)
-	_, writeErr = io.WriteString(w, var2)
-	if writeErr != nil {
-		return writeErr
-	}
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
-	}
-	var var3 string = aliastemplate1.HTMLEscapeString(data.Some)
-	_, writeErr = io.WriteString(w, var3)
-	if writeErr != nil {
-		return writeErr
-	}
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
+	template.HTMLEscape(w, []byte(data.Some))
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
 	var tplP string = data.Some
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
-	var var4 string = aliastemplate1.HTMLEscapeString(data.Some)
-	_, writeErr = io.WriteString(w, var4)
-	if writeErr != nil {
-		return writeErr
+	template.HTMLEscape(w, []byte(data.Some))
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
+	template.HTMLEscape(w, []byte(data.Some))
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
-	var var5 string = aliastemplate1.HTMLEscapeString(data.Some)
-	_, writeErr = io.WriteString(w, var5)
-	if writeErr != nil {
-		return writeErr
+	template.HTMLEscape(w, []byte(data.Some))
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
-	}
-	var var6 string = aliastemplate1.HTMLEscapeString(data.Some)
-	_, writeErr = io.WriteString(w, var6)
-	if writeErr != nil {
-		return writeErr
-	}
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
-	}
-	var var7 string = aliastemplate1.HTMLEscapeString(tplP)
-	_, writeErr = io.WriteString(w, var7)
-	if writeErr != nil {
-		return writeErr
-	}
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
+	template.HTMLEscape(w, []byte(tplP))
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
 	return nil
 }
 
 func fndTpl(t parse.Templater, w io.Writer, indata interface{}) error {
-	var writeErr error
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
-	writeErr = t.ExecuteTemplate(w, "tt", nil)
-	if writeErr != nil {
-		return writeErr
+	if werr := t.ExecuteTemplate(w, "tt", nil); werr != nil {
+		return werr
 	}
-	_, writeErr = w.Write(builtin3)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin3); werr != nil {
+		return werr
 	}
 	return nil
 }
 
 func fndTplTt(t parse.Templater, w io.Writer, indata interface{}) error {
-	var writeErr error
-	_, writeErr = w.Write(builtin4)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin4); werr != nil {
+		return werr
 	}
 	return nil
 }
@@ -196,47 +143,35 @@ func fneTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 	if d, ok := indata.(aliasdata.MyTemplateData); ok {
 		data = d
 	}
-	var writeErr error
-	_, writeErr = w.Write(builtin5)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin5); werr != nil {
+		return werr
 	}
 	var var1 int = len(data.Items)
 	var var0 bool = 0 != var1
 	if var0 {
-		_, writeErr = w.Write(builtin6)
-		if writeErr != nil {
-			return writeErr
+		if _, werr := w.Write(builtin6); werr != nil {
+			return werr
 		}
 		var var2 []string = data.Items
 		for _, iterable := range var2 {
-			_, writeErr = w.Write(builtin7)
-			if writeErr != nil {
-				return writeErr
+			if _, werr := w.Write(builtin7); werr != nil {
+				return werr
 			}
-			var var3 string = aliastemplate1.HTMLEscapeString(iterable)
-			_, writeErr = io.WriteString(w, var3)
-			if writeErr != nil {
-				return writeErr
-			}
-			_, writeErr = w.Write(builtin8)
-			if writeErr != nil {
-				return writeErr
+			template.HTMLEscape(w, []byte(iterable))
+			if _, werr := w.Write(builtin8); werr != nil {
+				return werr
 			}
 		}
-		_, writeErr = w.Write(builtin9)
-		if writeErr != nil {
-			return writeErr
+		if _, werr := w.Write(builtin9); werr != nil {
+			return werr
 		}
 	} else {
-		_, writeErr = w.Write(builtin10)
-		if writeErr != nil {
-			return writeErr
+		if _, werr := w.Write(builtin10); werr != nil {
+			return werr
 		}
 	}
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
 	return nil
 }
@@ -246,47 +181,35 @@ func fnfTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 	if d, ok := indata.(aliasdata.MyTemplateData); ok {
 		data = d
 	}
-	var writeErr error
-	_, writeErr = w.Write(builtin5)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin5); werr != nil {
+		return werr
 	}
 	var var1 int = len(data.MethodItems())
 	var var0 bool = 0 != var1
 	if var0 {
-		_, writeErr = w.Write(builtin6)
-		if writeErr != nil {
-			return writeErr
+		if _, werr := w.Write(builtin6); werr != nil {
+			return werr
 		}
 		var var2 []string = data.MethodItems()
 		for _, iterable := range var2 {
-			_, writeErr = w.Write(builtin7)
-			if writeErr != nil {
-				return writeErr
+			if _, werr := w.Write(builtin7); werr != nil {
+				return werr
 			}
-			var var3 string = aliastemplate1.HTMLEscapeString(iterable)
-			_, writeErr = io.WriteString(w, var3)
-			if writeErr != nil {
-				return writeErr
-			}
-			_, writeErr = w.Write(builtin8)
-			if writeErr != nil {
-				return writeErr
+			template.HTMLEscape(w, []byte(iterable))
+			if _, werr := w.Write(builtin8); werr != nil {
+				return werr
 			}
 		}
-		_, writeErr = w.Write(builtin9)
-		if writeErr != nil {
-			return writeErr
+		if _, werr := w.Write(builtin9); werr != nil {
+			return werr
 		}
 	} else {
-		_, writeErr = w.Write(builtin10)
-		if writeErr != nil {
-			return writeErr
+		if _, werr := w.Write(builtin10); werr != nil {
+			return werr
 		}
 	}
-	_, writeErr = w.Write(builtin2)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin2); werr != nil {
+		return werr
 	}
 	return nil
 }
@@ -296,20 +219,15 @@ func fnnotafileEmbed(t parse.Templater, w io.Writer, indata interface{}) error {
 	if d, ok := indata.(aliasdata.MyTemplateData); ok {
 		data = d
 	}
-	var writeErr error
-	_, writeErr = fmt.Fprintf(w, "%v", data)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := fmt.Fprintf(w, "%v", data); werr != nil {
+		return werr
 	}
 	return nil
 }
 
 func fnnotafile(t parse.Templater, w io.Writer, indata interface{}) error {
-	var writeErr error
-	_, writeErr = w.Write(builtin11)
-	if writeErr != nil {
-		return writeErr
+	if _, werr := w.Write(builtin11); werr != nil {
+		return werr
 	}
 	return nil
 }
-

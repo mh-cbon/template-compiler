@@ -33,7 +33,7 @@ func NewCompiledTemplatesProgram(varName string) *CompiledTemplatesProgram {
 	ret := &CompiledTemplatesProgram{
 		varName: varName,
 		idents: []string{
-			"t", "w", "data", "indata", varName,
+			"t", "w", "werr", "data", "indata", varName,
 		},
 		builtinTexts: map[string]string{},
 	}

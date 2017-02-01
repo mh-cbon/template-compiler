@@ -56,7 +56,7 @@ func init() {
 	fCompiledTemplate = compiledTemplates.MustGet("f.tpl")
 
 	tplData.Some = "Some string"
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 200; i++ {
 		tplData.Items = append(tplData.Items, fmt.Sprintf("item %v", i))
 	}
 }
@@ -223,3 +223,15 @@ func BenchmarkRenderWithJitTemplateF(b *testing.B) {
 		fJitTemplate.Execute(ioutil.Discard, tplData)
 	}
 }
+
+// func BenchmarkHTMLEscapeString(b *testing.B) {
+// 	for n := 0; n < b.N; n++ {
+// 		template.HTMLEscapeString("some string")
+// 	}
+// }
+//
+// func BenchmarkHTMLEscape(b *testing.B) {
+// 	for n := 0; n < b.N; n++ {
+// 		template.HTMLEscape(ioutil.Discard, []byte("some string"))
+// 	}
+// }

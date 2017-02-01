@@ -71,10 +71,8 @@ func TestConvert(t *testing.T) {
 			tplstr:    `Hello!`,
 			dataValue: TemplateData{},
 			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
-  var writeErr error
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -103,11 +101,9 @@ func TestConvert(t *testing.T) {
 			tplstr:    `{{$y := "Hello!"}}{{$y}}`,
 			dataValue: TemplateData{},
 			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
-  var writeErr error
   var tplY string = "Hello!"
-  _, writeErr = io.WriteString(w, tplY)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, tplY); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -122,16 +118,13 @@ func TestConvert(t *testing.T) {
 			tplstr:    `{{if true}}true{{else}}false{{end}}`,
 			dataValue: TemplateData{},
 			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
-  var writeErr error
   if true {
-    _, writeErr = w.Write(builtin0)
-    if writeErr != nil {
-      return writeErr
+    if _, werr := w.Write(builtin0); werr != nil {
+      return werr
     }
   } else {
-    _, writeErr = w.Write(builtin1)
-    if writeErr != nil {
-      return writeErr
+    if _, werr := w.Write(builtin1); werr != nil {
+      return werr
     }
   }
   return nil
@@ -168,164 +161,128 @@ func TestConvert(t *testing.T) {
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 string = data.SomeString
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var0); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var1 int = data.SomeInt
-  _, writeErr = io.WriteString(w, strconv.Itoa(var1))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.Itoa(var1)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var2 bool = data.SomeBool
-  _, writeErr = io.WriteString(w, strconv.FormatBool(var2))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.FormatBool(var2)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var3 int8 = data.SomeInt8
-  _, writeErr = io.WriteString(w, strconv.FormatInt(int64(var3), 10))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.FormatInt(int64(var3), 10)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var4 int16 = data.SomeInt16
-  _, writeErr = io.WriteString(w, strconv.FormatInt(int64(var4), 10))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.FormatInt(int64(var4), 10)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var5 int32 = data.SomeInt32
-  _, writeErr = io.WriteString(w, strconv.FormatInt(int64(var5), 10))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.FormatInt(int64(var5), 10)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var6 int64 = data.SomeInt64
-  _, writeErr = io.WriteString(w, strconv.FormatInt(var6, 10))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.FormatInt(var6, 10)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var7 uint = data.SomeUint
-  _, writeErr = io.WriteString(w, strconv.FormatUint(var7, 10))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.FormatUint(var7, 10)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var8 uint8 = data.SomeUint8
-  _, writeErr = io.WriteString(w, strconv.FormatUint(var8, 10))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.FormatUint(var8, 10)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var9 uint16 = data.SomeUint16
-  _, writeErr = io.WriteString(w, strconv.FormatUint(var9, 10))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.FormatUint(var9, 10)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var10 uint32 = data.SomeUint32
-  _, writeErr = io.WriteString(w, strconv.FormatUint(var10, 10))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.FormatUint(var10, 10)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var11 uint64 = data.SomeUint64
-  _, writeErr = io.WriteString(w, strconv.FormatUint(var11, 10))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.FormatUint(var11, 10)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var12 float32 = data.SomeFloat32
-  _, writeErr = io.WriteString(w, strconv.FormatFloat(float64(var12), "f", -1, 32))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.FormatFloat(float64(var12), "f", -1, 32)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var13 float64 = data.SomeFloat64
-  _, writeErr = io.WriteString(w, strconv.FormatFloat(var13, "f", -1, 64))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.FormatFloat(var13, "f", -1, 64)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var14 int32 = data.SomeRune
-  _, writeErr = io.WriteString(w, strconv.FormatInt(int64(var14), 10))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.FormatInt(int64(var14), 10)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var15 uint8 = data.SomeByte
-  _, writeErr = io.WriteString(w, strconv.FormatUint(var15, 10))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.FormatUint(var15, 10)); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var16 []uint8 = data.SomeByteSlice
-  _, writeErr = w.Write(var16)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(var16); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var17 []int32 = data.SomeRuneSlice
-  _, writeErr = fmt.Fprintf(w, "%v", var17)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := fmt.Fprintf(w, "%v", var17); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -347,12 +304,10 @@ func TestConvert(t *testing.T) {
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 []uint8 = data.SomeByteSlice
   for _, iterable := range var0 {
-    _, writeErr = io.WriteString(w, strconv.FormatUint(iterable, 10))
-    if writeErr != nil {
-      return writeErr
+    if _, werr := io.WriteString(w, strconv.FormatUint(iterable, 10)); werr != nil {
+      return werr
     }
   }
   return nil
@@ -374,12 +329,10 @@ func TestConvert(t *testing.T) {
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 []uint8 = data.SomeByteSlice
   for tplI, tplV := range var0 {
-    _, writeErr = io.WriteString(w, strconv.FormatUint(tplV, 10))
-    if writeErr != nil {
-      return writeErr
+    if _, werr := io.WriteString(w, strconv.FormatUint(tplV, 10)); werr != nil {
+      return werr
     }
   }
   return nil
@@ -404,23 +357,19 @@ func TestConvert(t *testing.T) {
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 []*compiler.TemplateData = data.SomeTemplateDataSlice
   for tplI, tplV := range var0 {
-    _, writeErr = w.Write(builtin0)
-    if writeErr != nil {
-      return writeErr
+    if _, werr := w.Write(builtin0); werr != nil {
+      return werr
     }
     var var1 []*compiler.TemplateData = tplV.SomeTemplateDataSlice
     for tplIShadow, tplVShadow := range var1 {
-      _, writeErr = w.Write(builtin0)
-      if writeErr != nil {
-        return writeErr
+      if _, werr := w.Write(builtin0); werr != nil {
+        return werr
       }
     }
-    _, writeErr = w.Write(builtin0)
-    if writeErr != nil {
-      return writeErr
+    if _, werr := w.Write(builtin0); werr != nil {
+      return werr
     }
   }
   return nil
@@ -445,18 +394,15 @@ Hello else branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 []*compiler.TemplateData = data.SomeTemplateDataSlice
   for tplI, tplV := range var0 {
-    _, writeErr = w.Write(builtin0)
-    if writeErr != nil {
-      return writeErr
+    if _, werr := w.Write(builtin0); werr != nil {
+      return werr
     }
   }
   if len(var0) == 0 {
-    _, writeErr = w.Write(builtin1)
-    if writeErr != nil {
-      return writeErr
+    if _, werr := w.Write(builtin1); werr != nil {
+      return werr
     }
   }
   return nil
@@ -484,18 +430,15 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 compiler.TemplateData = data
   {
     if true {
-      _, writeErr = w.Write(builtin0)
-      if writeErr != nil {
-        return writeErr
+      if _, werr := w.Write(builtin0); werr != nil {
+        return werr
       }
     } else {
-      _, writeErr = w.Write(builtin1)
-      if writeErr != nil {
-        return writeErr
+      if _, werr := w.Write(builtin1); werr != nil {
+        return werr
       }
     }
   }
@@ -520,20 +463,17 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 compiler.TemplateData = data
   {
     if true {
       var var1 string = var0.SomeString
-      _, writeErr = io.WriteString(w, var1)
-      if writeErr != nil {
-        return writeErr
+      if _, werr := io.WriteString(w, var1); werr != nil {
+        return werr
       }
     } else {
       var var2 string = data.SomeString
-      _, writeErr = io.WriteString(w, var2)
-      if writeErr != nil {
-        return writeErr
+      if _, werr := io.WriteString(w, var2); werr != nil {
+        return werr
       }
     }
   }
@@ -596,125 +536,107 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 string = data.SomeString
   if var0 != "" {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var1 int = data.SomeInt
   if var1 != 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var2 bool = data.SomeBool
   if var2 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var3 int8 = data.SomeInt8
   if var3 != 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var4 int16 = data.SomeInt16
   if var4 != 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var5 int32 = data.SomeInt32
   if var5 != 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var6 int64 = data.SomeInt64
   if var6 != 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var7 uint = data.SomeUint
   if var7 != 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var8 uint8 = data.SomeUint8
   if var8 != 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var9 uint16 = data.SomeUint16
   if var9 != 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var10 uint32 = data.SomeUint32
   if var10 != 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var11 uint64 = data.SomeUint64
   if var11 != 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var12 float32 = data.SomeFloat32
   if var12 != 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var13 float64 = data.SomeFloat64
   if var13 != 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var14 int32 = data.SomeRune
   if var14 != 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var15 uint8 = data.SomeByte
   if var15 != 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var16 []uint8 = data.SomeByteSlice
   if len(var16) > 0 {
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var17 []int32 = data.SomeRuneSlice
   if len(var17) > 0 {
@@ -735,16 +657,13 @@ Hello without branch!
 {{$complex := 1i}}`,
 			dataValue: TemplateData{SomeString: "Hello!"},
 			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
-  var writeErr error
   var tplInt int = 4
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var tplFloat float64 = 4.0
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var tplComplex complex128 = 1i
   return nil
@@ -764,11 +683,9 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 string = data.MethodHello()
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -788,11 +705,9 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 string = data.MethodArgHello("me")
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -812,11 +727,9 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 string = data.MethodArgHello2("me", "you")
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -836,14 +749,12 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var0, err := data.MethodArgHelloMultipleReturn("me", "you")
   if err != nil {
     return err
   }
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -863,12 +774,10 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var tplX compiler.TemplateData = data
   var var0 string = tplX.MethodHello()
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -888,12 +797,10 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var tplX compiler.TemplateData = data
   var var0 string = tplX.MethodArgHello("me")
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -913,12 +820,10 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var tplX compiler.TemplateData = data
   var var0 string = tplX.MethodArgHello2("me", "you")
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -938,15 +843,13 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var tplX compiler.TemplateData = data
   var0, err := tplX.MethodArgHelloMultipleReturn("me", "you")
   if err != nil {
     return err
   }
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -961,11 +864,9 @@ Hello without branch!
 		TestData{
 			tplstr: `{{up "rr"}}`,
 			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
-  var writeErr error
   var var0 string = t.GetFuncs()["up"].(func(string) string)("rr")
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -983,11 +884,9 @@ Hello without branch!
 		TestData{
 			tplstr: `{{split "rr" "r"}}`,
 			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
-  var writeErr error
   var var0 string = t.GetFuncs()["split"].(func(string, string) string)("rr", "r")
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -1005,14 +904,12 @@ Hello without branch!
 		TestData{
 			tplstr: `{{fnerr "r"}}`,
 			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
-  var writeErr error
   var0, err := t.GetFuncs()["fnerr"].(func(string) (string, error))("r")
   if err != nil {
     return err
   }
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -1035,11 +932,9 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 interface {} = data.SomeInterface
-  _, writeErr = fmt.Fprintf(w, "%v", var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := fmt.Fprintf(w, "%v", var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -1060,11 +955,9 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 interface{} = funcmap.BrowsePropertyPath(data, "SomeInterface.SomeInterface")
-  _, writeErr = fmt.Fprintf(w, "%v", var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := fmt.Fprintf(w, "%v", var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -1095,12 +988,10 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var tplX interface{} = data.SomeInterface
   var var0 interface{} = funcmap.BrowsePropertyPath(tplX, "SomeInterface")
-  _, writeErr = fmt.Fprintf(w, "%v", var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := fmt.Fprintf(w, "%v", var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -1131,12 +1022,10 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var tplX interface{} = data.SomeInterface
   var var0 interface{} = funcmap.BrowsePropertyPath(tplX, "MethodHello")
-  _, writeErr = fmt.Fprintf(w, "%v", var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := fmt.Fprintf(w, "%v", var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -1167,12 +1056,10 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var tplX interface{} = data.SomeInterface
   var var0 interface{} = funcmap.BrowsePropertyPath(tplX, "MethodArgHello2", "me", "you")
-  _, writeErr = fmt.Fprintf(w, "%v", var0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := fmt.Fprintf(w, "%v", var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -1199,15 +1086,12 @@ Hello without branch!
 			tplstr:    `{{define "rr"}}what{{end}}ww{{template "rr" (up "rr")}}`,
 			dataValue: TemplateData{SomeInterface: TemplateData{}},
 			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
-  var writeErr error
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin0); werr != nil {
+    return werr
   }
   var var0 string = t.GetFuncs()["up"].(func(string) string)("rr")
-  writeErr = t.ExecuteTemplate(w, "rr", var0)
-  if writeErr != nil {
-    return writeErr
+  if werr := t.ExecuteTemplate(w, "rr", var0); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -1225,7 +1109,6 @@ Hello without branch!
 			tplstr:    `{{html "rr"}}`,
 			dataValue: TemplateData{SomeInterface: TemplateData{}},
 			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
-  var writeErr error
   template.HTMLEscape(w, []byte("rr"))
   return nil
 }`,
@@ -1255,12 +1138,10 @@ Hello without branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 []*compiler.TemplateData = data.SomeTemplateDataSlice
   var var1 int = len(var0)
-  _, writeErr = io.WriteString(w, strconv.Itoa(var1))
-  if writeErr != nil {
-    return writeErr
+  if _, werr := io.WriteString(w, strconv.Itoa(var1)); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -1327,70 +1208,57 @@ Hello else branch!
   if d, ok := indata.(compiler.TemplateData); ok {
     data = d
   }
-  var writeErr error
   var var0 []*compiler.TemplateData = data.SomeTemplateDataSlice
   for tplI, tplV := range var0 {
-    _, writeErr = w.Write(builtin0)
-    if writeErr != nil {
-      return writeErr
+    if _, werr := w.Write(builtin0); werr != nil {
+      return werr
     }
     var tplY bool = false
-    _, writeErr = w.Write(builtin1)
-    if writeErr != nil {
-      return writeErr
+    if _, werr := w.Write(builtin1); werr != nil {
+      return werr
     }
   }
   if len(var0) == 0 {
-    _, writeErr = w.Write(builtin2)
-    if writeErr != nil {
-      return writeErr
+    if _, werr := w.Write(builtin2); werr != nil {
+      return werr
     }
     var tplYShadow bool = false
-    _, writeErr = w.Write(builtin1)
-    if writeErr != nil {
-      return writeErr
+    if _, werr := w.Write(builtin1); werr != nil {
+      return werr
     }
   }
-  _, writeErr = w.Write(builtin1)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin1); werr != nil {
+    return werr
   }
   var tplYShadow0 bool = true
-  _, writeErr = w.Write(builtin1)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin1); werr != nil {
+    return werr
   }
   if tplYShadow0 {
-    _, writeErr = w.Write(builtin3)
-    if writeErr != nil {
-      return writeErr
+    if _, werr := w.Write(builtin3); werr != nil {
+      return werr
     }
   } else {
-    _, writeErr = w.Write(builtin4)
-    if writeErr != nil {
-      return writeErr
+    if _, werr := w.Write(builtin4); werr != nil {
+      return werr
     }
   }
-  _, writeErr = w.Write(builtin1)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin1); werr != nil {
+    return werr
   }
   {
     if tplYShadow0 {
-      _, writeErr = io.WriteString(w, strconv.FormatBool(tplYShadow0))
-      if writeErr != nil {
-        return writeErr
+      if _, werr := io.WriteString(w, strconv.FormatBool(tplYShadow0)); werr != nil {
+        return werr
       }
     } else {
-      _, writeErr = io.WriteString(w, strconv.FormatBool(data))
-      if writeErr != nil {
-        return writeErr
+      if _, werr := io.WriteString(w, strconv.FormatBool(data)); werr != nil {
+        return werr
       }
     }
   }
-  _, writeErr = w.Write(builtin1)
-  if writeErr != nil {
-    return writeErr
+  if _, werr := w.Write(builtin1); werr != nil {
+    return werr
   }
   return nil
 }`,
@@ -1446,7 +1314,8 @@ Hello else branch!
 
 		if compiledFn != testData.expectCompiledFn {
 			t.Errorf(
-				"Unexpected compiled function. Expected=\n%v\n-----\nGot=\n%v\nTEMPLATE:\n%v\nSIMPLIFIED TEMPLATE:\n%v\n",
+				"Test(%v): Unexpected compiled function. Expected=\n%v\n-----\nGot=\n%v\nTEMPLATE:\n%v\nSIMPLIFIED TEMPLATE:\n%v\n",
+				i,
 				testData.expectCompiledFn,
 				compiledFn,
 				testData.tplstr,
@@ -1460,7 +1329,8 @@ Hello else branch!
 		for text, varname := range builtinTexts {
 			if expectVarName, ok := testData.expectBuiltins[text]; ok == false {
 				t.Errorf(
-					"Unexpected builtin variable. Compilation produced an unexpected builtin variable %v for the text %q\nTEMPLATE:\n%v\n",
+					"Test(%v): Unexpected builtin variable. Compilation produced an unexpected builtin variable %v for the text %q\nTEMPLATE:\n%v\n",
+					i,
 					varname,
 					text,
 					testData.tplstr,
@@ -1468,7 +1338,8 @@ Hello else branch!
 				return
 			} else if expectVarName != varname {
 				t.Errorf(
-					"Incorrect variable name for builtin text. The text %q should be registered in the variable %v\nTEMPLATE:\n%v\n",
+					"Test(%v): Incorrect variable name for builtin text. The text %q should be registered in the variable %v\nTEMPLATE:\n%v\n",
+					i,
 					text,
 					varname,
 					testData.tplstr,
@@ -1479,7 +1350,8 @@ Hello else branch!
 		for text, varname := range testData.expectBuiltins {
 			if _, ok := builtinTexts[text]; ok == false {
 				t.Errorf(
-					"Expected builtin variable was not found. Compilation did not produce the builtin variable %v with the text %q\nTEMPLATE:\n%v\n",
+					"Test(%v): Expected builtin variable was not found. Compilation did not produce the builtin variable %v with the text %q\nTEMPLATE:\n%v\n",
+					i,
 					varname,
 					text,
 					testData.tplstr,
@@ -1493,7 +1365,8 @@ Hello else branch!
 		expectedImports := testData.expectImports
 		if len(expectedImports) != len(gotImports) {
 			t.Errorf(
-				"Unexpected additionnal imports. Expected=\n%v\n-----\nGot=\n%v\nTEMPLATE:\n%v\nSIMPLIFIED TEMPLATE:\n%v\n",
+				"Test(%v): Unexpected additionnal imports. Expected=\n%v\n-----\nGot=\n%v\nTEMPLATE:\n%v\nSIMPLIFIED TEMPLATE:\n%v\n",
+				i,
 				expectedImports,
 				gotImports,
 				testData.tplstr,
@@ -1501,22 +1374,24 @@ Hello else branch!
 			)
 			return
 		}
-		for _, i := range expectedImports {
-			if strExists(i, gotImports) == false {
+		for _, im := range expectedImports {
+			if strExists(im, gotImports) == false {
 				t.Errorf(
-					"Missing additionnal imports. Missing=%v\nTEMPLATE:\n%v\nSIMPLIFIED TEMPLATE:\n%v\n",
+					"Test(%v): Missing additionnal imports. Missing=%v\nTEMPLATE:\n%v\nSIMPLIFIED TEMPLATE:\n%v\n",
 					i,
+					im,
 					testData.tplstr,
 					tpl.Tree.Root.String(),
 				)
 				return
 			}
 		}
-		for _, i := range gotImports {
-			if strExists(i, expectedImports) == false {
+		for _, im := range gotImports {
+			if strExists(im, expectedImports) == false {
 				t.Errorf(
-					"Unexpected additionnal imports. Unwanted=%v\nTEMPLATE:\n%v\nSIMPLIFIED TEMPLATE:\n%v\n",
+					"Test(%v): Unexpected additionnal imports. Unwanted=%v\nTEMPLATE:\n%v\nSIMPLIFIED TEMPLATE:\n%v\n",
 					i,
+					im,
 					testData.tplstr,
 					tpl.Tree.Root.String(),
 				)

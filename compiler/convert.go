@@ -143,9 +143,9 @@ func convertTplTree(
 		c.fn.Body.List = append(c.fn.Body.List, makePrelude(dataQualifier)...)
 	}
 	// if the template prints anything, adds a writeError for the rest of the function.
-	if simplifier.PrintsAnything(c.tree) {
-		c.fn.Body.List = append(c.fn.Body.List, makeWriteErrorDecl())
-	}
+	// if simplifier.PrintsAnything(c.tree) {
+	// 	c.fn.Body.List = append(c.fn.Body.List, makeWriteErrorDecl())
+	// }
 
 	// enter into the function scope
 	typeCheck.Enter()
@@ -391,9 +391,8 @@ func (c *converter) handleTemplateNode(node *parse.TemplateNode, typeCheck *simp
 	}
 
 	return getStmtsAst(`
-writeErr = t.ExecuteTemplate(` + c.writerName + `, "` + node.Name + `"` + expr + `)
-if writeErr != nil {
-  return writeErr
+if werr := t.ExecuteTemplate(` + c.writerName + `, "` + node.Name + `"` + expr + `); werr != nil {
+  return werr
 }`)
 }
 func (c *converter) handleRangeNode(node *parse.RangeNode, typeCheck *simplifier.State) (*ast.RangeStmt, string) {
@@ -1063,9 +1062,9 @@ func (c *converter) convertVariableNode(node *parse.VariableNode, typeCheck *sim
 	return ret
 }
 
-func makeWriteErrorDecl() ast.Stmt {
-	return getStmtsAst(`var writeErr error`)[0]
-}
+// func makeWriteErrorDecl() ast.Stmt {
+// 	return getStmtsAst(`var writeErr error`)[0]
+// }
 
 func makePrelude(dataQualifier string) []ast.Stmt {
 	return getStmtsAst(`
@@ -1135,9 +1134,8 @@ func (c *converter) makeIoWrite(expr string, exprType reflect.Type) []ast.Stmt {
 		panic(err)
 	}
 	return getStmtsAst(`
-_, writeErr = ` + writeCall + `
-if writeErr!=nil{
-  return writeErr
+if _, werr := ` + writeCall + `; werr!=nil{
+  return werr
 }`)
 }
 

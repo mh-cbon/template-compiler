@@ -8,5 +8,5 @@ type MyTemplateData struct {
 
 // MethodItems ...
 func (m MyTemplateData) MethodItems() []string {
-	return []string{"", "", "", ""}
+	return m.Items
 }
