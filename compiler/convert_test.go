@@ -1226,11 +1226,7 @@ Hello without branch!
 			dataValue: TemplateData{SomeInterface: TemplateData{}},
 			expectCompiledFn: `func fn0(t parse.Templater, w io.Writer, indata interface {}) error {
   var writeErr error
-  var var0 string = template.HTMLEscapeString("rr")
-  _, writeErr = io.WriteString(w, var0)
-  if writeErr != nil {
-    return writeErr
-  }
+  template.HTMLEscape(w, []byte("rr"))
   return nil
 }`,
 			expectBuiltins: map[string]string{},
@@ -1241,7 +1237,7 @@ Hello without branch!
 			expectImports: []string{
 				"io",
 				"github.com/mh-cbon/template-compiler/std/text/template/parse",
-				"html/template",
+				"text/template",
 			},
 			funcsMapPublic: []map[string]string{
 				map[string]string{
