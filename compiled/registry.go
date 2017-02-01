@@ -1,6 +1,8 @@
 package compiled
 
 import (
+	"fmt"
+
 	"github.com/mh-cbon/template-compiler/std/text/template"
 	"github.com/mh-cbon/template-compiler/std/text/template/parse"
 )
@@ -38,5 +40,7 @@ func (t Registry) MustGet(name string) *template.Compiled {
 	if t, ok := t.templates[name]; ok {
 		return t
 	}
-	panic("template not found")
+	panic(
+		fmt.Errorf("template not found: %v", name),
+	)
 }
