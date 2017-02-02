@@ -241,12 +241,12 @@ transformed and simplified [with the help of this package](https://github.com/mh
   - It renames all template variables to prefix them with `tpl`
   - It simplifies structure such as `{{"son" | split "wat"}}` to `{{$var0 := split "wat" "son"}}{{$var0}}`
   - It produces a small type checker structure which registers variable and their type for each scope of the template.
-[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L361)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L381)
 8. `bootstrap-program` browses each simplified template tree, generates a go function corresponding to it.
-[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/convert.go#L87)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/convert.go#L120)
 9. `bootstrap-program` generates an `init` function to register to
 your configuration variable the new functions as their template name.
-[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L227)
+[We are here](https://github.com/mh-cbon/template-compiler/blob/master/compiler/compile.go#L249)
 10. `bootstrap-program` writes the fully generated program.
 
 ### Working with funcmap
