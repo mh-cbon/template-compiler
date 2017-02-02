@@ -218,9 +218,7 @@ available [here](https://github.com/mh-cbon/template-compiler/tree/master/demo/t
 
 ```
 
-Depending on the kind of template expect 5 to 30 times faster.
-
-About allocations they will get way more stable, expect 2 alloctions per template.
+Depending on the kind of template expect 5 to 30 times faster and much much less allocations.
 
 # Understanding
 
