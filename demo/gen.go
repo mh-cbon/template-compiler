@@ -3,46 +3,47 @@ package main
 //golint:ignore
 
 import (
-	"fmt"
 	"io"
-	"text/template"
-
-	aliasdata "github.com/mh-cbon/template-compiler/demo/data"
-	aliastemplate "github.com/mh-cbon/template-compiler/std/html/template"
 	"github.com/mh-cbon/template-compiler/std/text/template/parse"
+	aliasdata "github.com/mh-cbon/template-compiler/demo/data"
+	"text/template"
+	aliastemplate "github.com/mh-cbon/template-compiler/std/html/template"
+	"bytes"
+	"fmt"
 )
 
-var builtin10 = []byte("\nNo items!\n")
-var builtin1 = []byte("Hello from b!\n")
-var builtin2 = []byte("\n")
-var builtin3 = []byte(" World!\n")
-var builtin4 = []byte("Hello")
 var builtin6 = []byte("\n  <ul>\n  ")
+var builtin10 = []byte("\nNo items!\n")
+var builtin2 = []byte("\n")
+var builtin4 = []byte("Hello")
+var builtin3 = []byte(" World!\n")
+var builtin5 = []byte("This is a template!\n\n")
 var builtin7 = []byte("\n    <li>")
+var builtin8 = []byte("</li>\n  ")
 var builtin9 = []byte("\n  </ul>\n")
 var builtin11 = []byte("hello!")
 var builtin0 = []byte("Hello from a!\n")
-var builtin5 = []byte("This is a template!\n\n")
-var builtin8 = []byte("</li>\n  ")
+var builtin1 = []byte("Hello from b!\n")
 
-func init() {
-	compiledTemplates.Add("a.tpl", fnaTpl)
-	compiledTemplates.Add("b.tpl", fnbTpl)
-	compiledTemplates.Add("c.tpl", fncTpl)
-	compiledTemplates.Add("d.tpl", fndTpl)
-	compiledTemplates.Add("tt", fndTplTt)
-	compiledTemplates.Add("e.tpl", fneTpl)
-	compiledTemplates.Add("f.tpl", fnfTpl)
-	compiledTemplates.Add("embed", fnnotafileEmbed)
-	compiledTemplates.Add("notafile", fnnotafile)
-	tpl3X0 := compiledTemplates.MustGet("d.tpl")
-	tpl3Y0 := compiledTemplates.MustGet("tt")
-	tpl3X0, _ = tpl3X0.Compiled(tpl3Y0)
-	compiledTemplates.Set("d.tpl", tpl3X0)
-	tpl0X0 := compiledTemplates.MustGet("notafile")
-	tpl0Y0 := compiledTemplates.MustGet("embed")
-	tpl0X0, _ = tpl0X0.Compiled(tpl0Y0)
-	compiledTemplates.Set("notafile", tpl0X0)
+
+func init () {
+  compiledTemplates.Add("a.tpl", fnaTpl)
+  compiledTemplates.Add("b.tpl", fnbTpl)
+  compiledTemplates.Add("c.tpl", fncTpl)
+  compiledTemplates.Add("d.tpl", fndTpl)
+  compiledTemplates.Add("tt", fndTplTt)
+  compiledTemplates.Add("e.tpl", fneTpl)
+  compiledTemplates.Add("f.tpl", fnfTpl)
+  compiledTemplates.Add("embed", fnnotafileEmbed)
+  compiledTemplates.Add("notafile", fnnotafile)
+  tpl3X0 := compiledTemplates.MustGet("d.tpl")
+  tpl3Y0 := compiledTemplates.MustGet("tt")
+  tpl3X0, _ = tpl3X0.Compiled(tpl3Y0)
+  compiledTemplates.Set("d.tpl", tpl3X0)
+  tpl0X0 := compiledTemplates.MustGet("notafile")
+  tpl0Y0 := compiledTemplates.MustGet("embed")
+  tpl0X0, _ = tpl0X0.Compiled(tpl0Y0)
+  compiledTemplates.Set("notafile", tpl0X0)
 }
 
 func fnaTpl(t parse.Templater, w io.Writer, indata interface{}) error {
@@ -60,6 +61,7 @@ func fnbTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 }
 
 func fncTpl(t parse.Templater, w io.Writer, indata interface{}) error {
+	var bw bytes.Buffer
 	var data aliasdata.MyTemplateData
 	if d, ok := indata.(aliasdata.MyTemplateData); ok {
 		data = d
@@ -83,15 +85,22 @@ func fncTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 	if _, werr := w.Write(builtin2); werr != nil {
 		return werr
 	}
-	template.HTMLEscape(w, []byte(tplA))
+	bw.WriteString(tplA)
+	template.HTMLEscape(w, bw.Bytes())
+	bw.Reset()
 	if _, werr := w.Write(builtin2); werr != nil {
 		return werr
 	}
-	template.HTMLEscape(w, []byte(tplY))
+	bw.WriteString(tplY)
+	template.HTMLEscape(w, bw.Bytes())
+	bw.Reset()
 	if _, werr := w.Write(builtin2); werr != nil {
 		return werr
 	}
-	template.HTMLEscape(w, []byte(data.Some))
+	var var4 string = data.Some
+	bw.WriteString(var4)
+	template.HTMLEscape(w, bw.Bytes())
+	bw.Reset()
 	if _, werr := w.Write(builtin2); werr != nil {
 		return werr
 	}
@@ -99,19 +108,30 @@ func fncTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 	if _, werr := w.Write(builtin2); werr != nil {
 		return werr
 	}
-	template.HTMLEscape(w, []byte(data.Some))
+	var var6 string = data.Some
+	bw.WriteString(var6)
+	template.HTMLEscape(w, bw.Bytes())
+	bw.Reset()
 	if _, werr := w.Write(builtin2); werr != nil {
 		return werr
 	}
-	template.HTMLEscape(w, []byte(data.Some))
+	var var8 string = data.Some
+	bw.WriteString(var8)
+	template.HTMLEscape(w, bw.Bytes())
+	bw.Reset()
 	if _, werr := w.Write(builtin2); werr != nil {
 		return werr
 	}
-	template.HTMLEscape(w, []byte(data.Some))
+	var var10 string = data.Some
+	bw.WriteString(var10)
+	template.HTMLEscape(w, bw.Bytes())
+	bw.Reset()
 	if _, werr := w.Write(builtin2); werr != nil {
 		return werr
 	}
-	template.HTMLEscape(w, []byte(tplP))
+	bw.WriteString(tplP)
+	template.HTMLEscape(w, bw.Bytes())
+	bw.Reset()
 	if _, werr := w.Write(builtin2); werr != nil {
 		return werr
 	}
@@ -139,6 +159,7 @@ func fndTplTt(t parse.Templater, w io.Writer, indata interface{}) error {
 }
 
 func fneTpl(t parse.Templater, w io.Writer, indata interface{}) error {
+	var bw bytes.Buffer
 	var data aliasdata.MyTemplateData
 	if d, ok := indata.(aliasdata.MyTemplateData); ok {
 		data = d
@@ -146,18 +167,21 @@ func fneTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 	if _, werr := w.Write(builtin5); werr != nil {
 		return werr
 	}
-	var var1 int = len(data.Items)
+	var var2 []string = data.Items
+	var var1 int = len(var2)
 	var var0 bool = 0 != var1
 	if var0 {
 		if _, werr := w.Write(builtin6); werr != nil {
 			return werr
 		}
-		var var2 []string = data.Items
-		for _, iterable := range var2 {
+		var var3 []string = data.Items
+		for _, iterable := range var3 {
 			if _, werr := w.Write(builtin7); werr != nil {
 				return werr
 			}
-			template.HTMLEscape(w, []byte(iterable))
+			bw.WriteString(iterable)
+			template.HTMLEscape(w, bw.Bytes())
+			bw.Reset()
 			if _, werr := w.Write(builtin8); werr != nil {
 				return werr
 			}
@@ -177,6 +201,7 @@ func fneTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 }
 
 func fnfTpl(t parse.Templater, w io.Writer, indata interface{}) error {
+	var bw bytes.Buffer
 	var data aliasdata.MyTemplateData
 	if d, ok := indata.(aliasdata.MyTemplateData); ok {
 		data = d
@@ -184,18 +209,21 @@ func fnfTpl(t parse.Templater, w io.Writer, indata interface{}) error {
 	if _, werr := w.Write(builtin5); werr != nil {
 		return werr
 	}
-	var var1 int = len(data.MethodItems())
+	var var2 []string = data.MethodItems()
+	var var1 int = len(var2)
 	var var0 bool = 0 != var1
 	if var0 {
 		if _, werr := w.Write(builtin6); werr != nil {
 			return werr
 		}
-		var var2 []string = data.MethodItems()
-		for _, iterable := range var2 {
+		var var3 []string = data.MethodItems()
+		for _, iterable := range var3 {
 			if _, werr := w.Write(builtin7); werr != nil {
 				return werr
 			}
-			template.HTMLEscape(w, []byte(iterable))
+			bw.WriteString(iterable)
+			template.HTMLEscape(w, bw.Bytes())
+			bw.Reset()
 			if _, werr := w.Write(builtin8); werr != nil {
 				return werr
 			}
@@ -231,3 +259,4 @@ func fnnotafile(t parse.Templater, w io.Writer, indata interface{}) error {
 	}
 	return nil
 }
+

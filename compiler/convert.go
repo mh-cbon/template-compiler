@@ -39,16 +39,17 @@ var optimizedCalls = map[string]opitmizedFunc{
 
 // converter holds data to convert a template tree into a function.
 type converter struct {
-	tree               *parse.Tree
-	writerName         string
-	fn                 *ast.FuncDecl
-	state              *state
-	errvars            int
-	itervars           int
-	compiledProgram    *CompiledTemplatesProgram
-	funcsMap           map[string]interface{}
-	publicIdents       []map[string]string
-	skipNextActionNode bool
+	tree             *parse.Tree
+	writerName       string
+	bwriterName      string
+	fn               *ast.FuncDecl
+	state            *state
+	errvars          int
+	itervars         int
+	compiledProgram  *CompiledTemplatesProgram
+	funcsMap         map[string]interface{}
+	publicIdents     []map[string]string
+	skipNextVarPrint string
 }
 
 // createErrVars creates a unique error var name for a fucntion scope.
@@ -128,6 +129,7 @@ func convertTplTree(
 	c := converter{
 		tree:            tree,
 		writerName:      "w",
+		bwriterName:     "bw",
 		state:           &state{typeCheck: typeCheck},
 		errvars:         -1,
 		compiledProgram: compiledProgram,
@@ -142,10 +144,6 @@ func convertTplTree(
 		dataQualifier := compiledProgram.getDataQualifier(dataConfiguration)
 		c.fn.Body.List = append(c.fn.Body.List, makePrelude(dataQualifier)...)
 	}
-	// if the template prints anything, adds a writeError for the rest of the function.
-	// if simplifier.PrintsAnything(c.tree) {
-	// 	c.fn.Body.List = append(c.fn.Body.List, makeWriteErrorDecl())
-	// }
 
 	// enter into the function scope
 	typeCheck.Enter()
@@ -179,12 +177,17 @@ func (c *converter) convert(node interface{}, typeCheck *simplifier.State) {
 		}
 
 	case *parse.ActionNode:
-		if !c.skipNextActionNode {
-			for _, stmt := range c.handleActionNode(node, typeCheck) {
+
+		optimized := c.handleOptimizedActionNode(node, typeCheck)
+		if len(optimized) > 0 {
+			for _, stmt := range optimized {
 				c.state.addNode(stmt)
 			}
 		} else {
-			c.skipNextActionNode = false
+			// move on standard printing.
+			for _, stmt := range c.handleActionNode(node, typeCheck) {
+				c.state.addNode(stmt)
+			}
 		}
 
 	case *parse.IfNode:
@@ -263,8 +266,8 @@ func (c *converter) convert(node interface{}, typeCheck *simplifier.State) {
 }
 
 func injectReturnNil(fn *ast.FuncDecl) {
-	n := getStmtsAst(`return nil`)[0]
-	fn.Body.List = append(fn.Body.List, n)
+	n := getStmtsAst(`return nil`)
+	fn.Body.List = append(fn.Body.List, n...)
 }
 
 func embedInBlockStmt(s ast.Stmt) *ast.BlockStmt {
@@ -277,9 +280,19 @@ func (c *converter) handleTextNode(node *parse.TextNode) []ast.Stmt {
 }
 func (c *converter) handleActionNode(node *parse.ActionNode, typeCheck *simplifier.State) []ast.Stmt {
 	ret := []ast.Stmt{}
-	if len(node.Pipe.Decl) == 0 { // likely a print
-		t, _ := c.getTypesOfCommandNode(node.Pipe.Cmds[0], typeCheck)
-		expr := c.handleCommandNode(node.Pipe.Cmds[0], typeCheck)
+	if len(node.Pipe.Decl) == 0 { // a print
+
+		cmd := node.Pipe.Cmds[0]
+
+		if v, ok := cmd.Args[0].(*parse.VariableNode); ok {
+			if v.Ident[0] == c.skipNextVarPrint {
+				c.skipNextVarPrint = ""
+				return ret
+			}
+		}
+
+		t, _ := c.getTypesOfCommandNode(cmd, typeCheck)
+		expr := c.handleCommandNode(cmd, typeCheck)
 		if t != nil {
 			ret = c.makeIoWrite(astNodeToString(expr), t)
 		} else {
@@ -297,49 +310,172 @@ func (c *converter) handleActionNode(node *parse.ActionNode, typeCheck *simplifi
 			// x, err := call(...)
 			// It is assumed that the second return parameter
 			// is an err of type error.
-			assign := &ast.AssignStmt{}
-			assign.Lhs = make([]ast.Expr, 0)
-			for _, n := range node.Pipe.Decl {
-				assign.Lhs = append(assign.Lhs, c.convertVariableNode(n, typeCheck))
-			}
-			errVar := c.createErrVars()
-			assign.Lhs = append(assign.Lhs, &ast.Ident{Name: errVar})
-			assign.Tok = token.DEFINE
-			assign.Rhs = []ast.Expr{expr}
-			ret = append(ret, assign)
-
-			// Add the error check
-			ifErr := getStmtsAst(`
-if ` + errVar + ` != nil {
-  return ` + errVar + `
-}`)[0]
-			ret = append(ret, ifErr)
+			assignWithErr := c.makeAnAssignmentWithErr(node.Pipe.Decl, expr, typeCheck)
+			ret = append(ret, assignWithErr...)
 
 		} else if exprType != nil {
 			// this is a variable declaration,
 			// var x string = ""
-			vspec := &ast.ValueSpec{
-				Names:  []*ast.Ident{c.convertVariableNode(node.Pipe.Decl[0], typeCheck).(*ast.Ident)},
-				Type:   &ast.Ident{Name: exprType.String()},
-				Values: []ast.Expr{expr},
-			}
-			decl := &ast.GenDecl{Tok: token.VAR, Specs: []ast.Spec{vspec}}
-			ret = append(ret, &ast.DeclStmt{Decl: decl})
+			varDeclStmt := c.makeVarDeclaration(node.Pipe.Decl[0], exprType, expr, typeCheck)
+			ret = append(ret, varDeclStmt)
 		} else {
 			ret = append(ret, &ast.ExprStmt{X: expr})
 		}
 
 	} else { // likely a complex assignment
 		expr := c.handleCommandNode(node.Pipe.Cmds[0], typeCheck)
-		assign := &ast.AssignStmt{}
-		assign.Lhs = make([]ast.Expr, 0)
-		assign.Tok = token.DEFINE
-		assign.Rhs = make([]ast.Expr, 0)
-		assign.Rhs = append(assign.Rhs, expr)
-		for _, n := range node.Pipe.Decl {
-			assign.Lhs = append(assign.Lhs, c.convertVariableNode(n, typeCheck))
-		}
+		assign := c.makeAnAssignment(node.Pipe.Decl, expr, typeCheck)
 		ret = append(ret, assign)
+	}
+	return ret
+}
+func (c *converter) handleOptimizedActionNode(node *parse.ActionNode, typeCheck *simplifier.State) []ast.Stmt {
+	var ret []ast.Stmt
+
+	if len(node.Pipe.Decl) == 1 && len(node.Pipe.Cmds) == 1 { // care only about assigments
+
+		cmd := node.Pipe.Cmds[0]
+		if ident, ok := cmd.Args[0].(*parse.IdentifierNode); ok { // func call
+
+			// optimize html escaping
+			if len(cmd.Args) == 2 &&
+				ident.Ident == "html" ||
+				ident.Ident == "_html_template_htmlescaper" {
+				argType, _ := c.getTypesOfSomeNode(cmd.Args[1], typeCheck)
+				if argType.Kind() == reflect.String {
+
+					alias := c.compiledProgram.addImport("text/template")
+					wStmt := getStmtsAst(c.bwriterName + `.WriteString(iterable)
+    			` + alias + `.HTMLEscape(` + c.writerName + `, ` + c.bwriterName + `.Bytes())
+    			` + c.bwriterName + `.Reset()`)
+					wstring := wStmt[0]
+					fnCall := wstring.(*ast.ExprStmt).X.(*ast.CallExpr)
+					fnCall.Args[0] = c.convertNode(cmd.Args[1], typeCheck)
+
+					c.skipNextVarPrint = node.Pipe.Decl[0].Ident[0]
+
+					c.injectByteWriterPrelude()
+
+					ret = append(ret, wStmt...)
+					return ret
+				}
+			}
+
+			//-
+
+			// 	// they are equivalent funcs which can be replaced in place (almost).
+			// 	if f, ok := optimizedCalls[ident.Ident]; ok {
+			// 		// there may be something to do.
+			// 		if c.commandNodeMatchesFuncCall(f.Type, node, typeCheck) {
+			// 			alias := c.compiledProgram.addImport(f.PkgPath)
+			// 			ret := getStmtsAst(`` + alias + `.` + f.Name + `()`)[0]
+			// 			fnCall := ret.(*ast.ExprStmt).X.(*ast.CallExpr)
+			// 			c.addArgsToFuncCall(fnCall, node.Args[1:], typeCheck)
+			//
+			// 			return ret
+			// 		}
+			// 	}
+
+			//-
+
+			if len(cmd.Args) == 2 &&
+				ident.Ident == "len" {
+				argType, _ := c.getTypesOfSomeNode(cmd.Args[1], typeCheck)
+				// if len(argOut) > 0 {
+				// 	return nil // optimizable, later.
+				// }
+				if argType.Kind() == reflect.Ptr {
+					argType = argType.Elem()
+				}
+				if argType.Kind() != reflect.Array &&
+					argType.Kind() != reflect.Slice &&
+					argType.Kind() != reflect.String &&
+					argType.Kind() != reflect.Chan {
+					return nil // unlikely.
+				}
+				// all correct.
+				lenStmt := getStmtsAst(`len(x)`)[0]
+				fnCall := lenStmt.(*ast.ExprStmt).X.(*ast.CallExpr)
+				// remove x variable.
+				fnCall.Args = make([]ast.Expr, 0)
+				// add real arguments
+				c.addArgsToFuncCall(fnCall, cmd.Args[1:], typeCheck)
+				varDeclStmt := c.makeVarDeclaration(
+					node.Pipe.Decl[0],
+					reflect.TypeOf(1),
+					fnCall,
+					typeCheck)
+				ret = append(ret, varDeclStmt)
+				return ret
+			}
+
+			//-
+
+			if ident.Ident == "eq" ||
+				ident.Ident == "ne" ||
+				ident.Ident == "ge" ||
+				ident.Ident == "gt" ||
+				ident.Ident == "le" ||
+				ident.Ident == "lt" {
+				firstArg, _ := c.getTypesOfSomeNode(cmd.Args[1], typeCheck)
+				for _, a := range cmd.Args[2:] {
+					xArg, _ := c.getTypesOfSomeNode(a, typeCheck)
+					if xArg.Kind() != firstArg.Kind() {
+						return nil // inconsistent type checking, to improve later ?
+					}
+				}
+				tok := token.EQL
+				switch ident.Ident {
+				case "ne":
+					tok = token.NEQ
+				case "ge":
+					tok = token.GEQ
+				case "gt":
+					tok = token.GTR
+				case "le":
+					tok = token.LEQ
+				case "lt":
+					tok = token.LSS
+				}
+				//seems good.
+				var bTest *ast.BinaryExpr
+				for i := 1; i < len(cmd.Args); i += 2 {
+					if bTest == nil {
+						leftexpr := c.convertNode(cmd.Args[i], typeCheck)
+						rightexpr := c.convertNode(cmd.Args[i+1], typeCheck)
+						bTest = &ast.BinaryExpr{
+							X:  leftexpr,
+							Op: tok,
+							Y:  rightexpr,
+						}
+					} else {
+						leftexpr := c.convertNode(cmd.Args[i], typeCheck)
+						bTest = &ast.BinaryExpr{
+							X:  bTest,
+							Op: tok,
+							Y:  leftexpr,
+						}
+						if len(cmd.Args) > i+1 {
+							rightexpr := c.convertNode(cmd.Args[i+1], typeCheck)
+							bTest = &ast.BinaryExpr{
+								X:  bTest,
+								Op: tok,
+								Y:  rightexpr,
+							}
+						}
+					}
+				}
+				varDeclStmt := c.makeVarDeclaration(
+					node.Pipe.Decl[0],
+					reflect.TypeOf(true),
+					bTest,
+					typeCheck)
+				ret = append(ret, varDeclStmt)
+				return ret
+			}
+
+			//-
+		}
 	}
 	return ret
 }
@@ -486,21 +622,6 @@ func (c *converter) handleCommandNode(node *parse.CommandNode, typeCheck *simpli
 
 	} else {
 
-		/*
-			// y might be either
-			// - a func call missing its arguments
-			// - a binary expr (z==e)
-			// latter case should be returned immediately.
-			if _, ok := y.(*ast.ExprStmt).X.(*ast.BinaryExpr); ok {
-				return y.(*ast.ExprStmt).X
-			}
-			fnCall = y.(*ast.ExprStmt).X.(*ast.CallExpr)
-		*/
-		y := c.optimizedIdentifierCall(node, typeCheck)
-		if y != nil {
-			return y.(*ast.ExprStmt).X
-		}
-
 		var fnCall *ast.CallExpr
 
 		switch x := node.Args[0].(type) {
@@ -525,11 +646,49 @@ func (c *converter) handleCommandNode(node *parse.CommandNode, typeCheck *simpli
 	return ret
 }
 
+func (c *converter) makeAnAssignment(decls []*parse.VariableNode, expr ast.Expr, typeCheck *simplifier.State) *ast.AssignStmt {
+	assign := &ast.AssignStmt{}
+	assign.Lhs = make([]ast.Expr, 0)
+	for _, n := range decls {
+		assign.Lhs = append(assign.Lhs, c.convertVariableNode(n, typeCheck))
+	}
+	assign.Tok = token.DEFINE
+	assign.Rhs = make([]ast.Expr, 0)
+	assign.Rhs = append(assign.Rhs, expr)
+	return assign
+}
+
+func (c *converter) makeAnAssignmentWithErr(decls []*parse.VariableNode, expr ast.Expr, typeCheck *simplifier.State) []ast.Stmt {
+	var ret []ast.Stmt
+
+	assign := c.makeAnAssignment(decls, expr, typeCheck)
+	errVar := c.createErrVars()
+	assign.Lhs = append(assign.Lhs, &ast.Ident{Name: errVar})
+	ret = append(ret, assign)
+
+	// Add the error check
+	ifStmt := getStmtsAst(`
+if ` + errVar + ` != nil {
+return ` + errVar + `
+}`)[0]
+	ret = append(ret, ifStmt)
+
+	return ret
+}
+
+func (c *converter) makeVarDeclaration(decl *parse.VariableNode, exprType reflect.Type, expr ast.Expr, typeCheck *simplifier.State) ast.Stmt {
+	varIdent := c.convertVariableNode(decl, typeCheck).(*ast.Ident)
+	vspec := &ast.ValueSpec{
+		Names:  []*ast.Ident{varIdent},
+		Type:   &ast.Ident{Name: exprType.String()},
+		Values: []ast.Expr{expr},
+	}
+	astDecl := &ast.GenDecl{Tok: token.VAR, Specs: []ast.Spec{vspec}}
+	return &ast.DeclStmt{Decl: astDecl}
+}
+
 // Identify and returns the value type of the command node.
 func (c *converter) getTypesOfCommandNode(node *parse.CommandNode, typeCheck *simplifier.State) (reflect.Type, []reflect.Type) {
-	if handled, y, u := c.getTypesOfOptimizedNode(node, typeCheck); handled {
-		return y, u
-	}
 	return c.getTypesOfSomeNode(node.Args[0], typeCheck)
 }
 
@@ -649,123 +808,6 @@ func isHexConstant(s string) bool {
 
 // copied from template/exec.go?#L478
 
-// returns an optimized version of an identifier call.
-func (c *converter) optimizedIdentifierCall(node *parse.CommandNode, typeCheck *simplifier.State) ast.Stmt {
-	if ident, ok := node.Args[0].(*parse.IdentifierNode); ok {
-
-		if ident.Ident == "html" || ident.Ident == "_html_template_htmlescaper" {
-			if len(node.Args)-1 == 1 {
-				argType, _ := c.getTypesOfSomeNode(node.Args[1], typeCheck)
-				if argType.Kind() == reflect.String {
-					alias := c.compiledProgram.addImport("text/template")
-					wStmt := getStmtsAst(alias + `.HTMLEscape(` + c.writerName + `, []byte(""))`)[0]
-					fnCall := wStmt.(*ast.ExprStmt).X.(*ast.CallExpr)
-					fnCall.Args[1].(*ast.CallExpr).Args[0] = c.convertNode(node.Args[1], typeCheck)
-					c.skipNextActionNode = true
-					return wStmt
-				}
-			}
-		}
-
-		if f, ok := optimizedCalls[ident.Ident]; ok {
-			// there may be something to do.
-			if c.commandNodeMatchesFuncCall(f.Type, node, typeCheck) {
-				alias := c.compiledProgram.addImport(f.PkgPath)
-				ret := getStmtsAst(`` + alias + `.` + f.Name + `()`)[0]
-				fnCall := ret.(*ast.ExprStmt).X.(*ast.CallExpr)
-				c.addArgsToFuncCall(fnCall, node.Args[1:], typeCheck)
-				return ret
-			}
-		}
-
-		if ident.Ident == "len" {
-			if len(node.Args)-1 == 1 {
-				argType, _ := c.getTypesOfSomeNode(node.Args[1], typeCheck)
-				// if len(argOut) > 0 {
-				// 	return nil // optimizable, later.
-				// }
-				if argType.Kind() == reflect.Ptr {
-					argType = argType.Elem()
-				}
-				if argType.Kind() != reflect.Array &&
-					argType.Kind() != reflect.Slice &&
-					argType.Kind() != reflect.String &&
-					argType.Kind() != reflect.Chan {
-					return nil // unlikely.
-				}
-				// all correct.
-				lenStmt := getStmtsAst(`len(x)`)[0]
-				fnCall := lenStmt.(*ast.ExprStmt).X.(*ast.CallExpr)
-				// remove x variable.
-				fnCall.Args = make([]ast.Expr, 0)
-				// add real arguments
-				c.addArgsToFuncCall(fnCall, node.Args[1:], typeCheck)
-				return lenStmt
-			}
-		}
-
-		if ident.Ident == "eq" ||
-			ident.Ident == "ne" ||
-			ident.Ident == "ge" ||
-			ident.Ident == "gt" ||
-			ident.Ident == "le" ||
-			ident.Ident == "lt" {
-			firstArg, _ := c.getTypesOfSomeNode(node.Args[1], typeCheck)
-			for _, a := range node.Args[2:] {
-				xArg, _ := c.getTypesOfSomeNode(a, typeCheck)
-				if xArg.Kind() != firstArg.Kind() {
-					return nil // inconsistence type checking, to improve later ?
-				}
-			}
-			tok := token.EQL
-			switch ident.Ident {
-			case "ne":
-				tok = token.NEQ
-			case "ge":
-				tok = token.GEQ
-			case "gt":
-				tok = token.GTR
-			case "le":
-				tok = token.LEQ
-			case "lt":
-				tok = token.LSS
-			}
-			//seems good.
-			var bTest *ast.BinaryExpr
-			for i := 1; i < len(node.Args); i += 2 {
-				if bTest == nil {
-					leftexpr := c.convertNode(node.Args[i], typeCheck)
-					rightexpr := c.convertNode(node.Args[i+1], typeCheck)
-					bTest = &ast.BinaryExpr{
-						X:  leftexpr,
-						Op: tok,
-						Y:  rightexpr,
-					}
-				} else {
-					leftexpr := c.convertNode(node.Args[i], typeCheck)
-					bTest = &ast.BinaryExpr{
-						X:  bTest,
-						Op: tok,
-						Y:  leftexpr,
-					}
-					if len(node.Args) > i+1 {
-						rightexpr := c.convertNode(node.Args[i+1], typeCheck)
-						bTest = &ast.BinaryExpr{
-							X:  bTest,
-							Op: tok,
-							Y:  rightexpr,
-						}
-					}
-				}
-			}
-			return &ast.ExprStmt{X: bTest}
-		}
-		//-
-	}
-
-	return nil
-}
-
 func (c *converter) addArgsToFuncCall(fnCall *ast.CallExpr, args []parse.Node, typeCheck *simplifier.State) {
 	for _, a := range args {
 		e := c.convertNode(a, typeCheck)
@@ -777,53 +819,6 @@ func (c *converter) addArgsToFuncCall(fnCall *ast.CallExpr, args []parse.Node, t
 		}
 		fnCall.Args = append(fnCall.Args, e)
 	}
-}
-
-// returns appropriate types for an optimized call, which is a bit tricky :x.
-func (c *converter) getTypesOfOptimizedNode(node *parse.CommandNode, typeCheck *simplifier.State) (bool, reflect.Type, []reflect.Type) {
-	if len(node.Args) > 0 {
-		if ident, ok := node.Args[0].(*parse.IdentifierNode); ok {
-
-			if ident.Ident == "html" || ident.Ident == "_html_template_htmlescaper" {
-				if len(node.Args)-1 == 1 {
-					argType, _ := c.getTypesOfSomeNode(node.Args[1], typeCheck)
-					if argType.Kind() == reflect.String {
-						return true, nil, nil
-					}
-				}
-			}
-
-			if ident.Ident == "len" {
-				return true, reflect.TypeOf(1), []reflect.Type{}
-			}
-			if ident.Ident == "eq" ||
-				ident.Ident == "ne" ||
-				ident.Ident == "ge" ||
-				ident.Ident == "gt" ||
-				ident.Ident == "le" ||
-				ident.Ident == "lt" {
-				firstArg, _ := c.getTypesOfSomeNode(node.Args[1], typeCheck)
-				for _, a := range node.Args[2:] {
-					xArg, _ := c.getTypesOfSomeNode(a, typeCheck)
-					if xArg.Kind() != firstArg.Kind() {
-						return false, nil, nil
-					}
-				}
-				// semms good.
-				return true, reflect.TypeOf(true), []reflect.Type{}
-			}
-			if f, ok := optimizedCalls[ident.Ident]; ok {
-				if c.commandNodeMatchesFuncCall(f.Type, node, typeCheck) {
-					var outs []reflect.Type
-					for i := 0; i < f.Type.NumOut(); i++ {
-						outs = append(outs, f.Type.Out(i))
-					}
-					return true, outs[0], outs[1:]
-				}
-			}
-		}
-	}
-	return false, nil, nil
 }
 
 // tells if a command node matches a function signature.
@@ -1015,7 +1010,7 @@ func (c *converter) convertNumberNode(node *parse.NumberNode) *ast.BasicLit {
 }
 func (c *converter) convertFieldNode(node *parse.FieldNode, typeCheck *simplifier.State) ast.Expr {
 	var ret ast.Expr
-	for i := 0; i < len(node.Ident); i += 2 {
+	for i := 0; i < len(node.Ident); i++ {
 		if ret == nil {
 			ret = &ast.SelectorExpr{
 				X:   &ast.Ident{Name: c.state.dotVar()},
@@ -1061,6 +1056,23 @@ func (c *converter) convertVariableNode(node *parse.VariableNode, typeCheck *sim
 	}
 	return ret
 }
+func (c *converter) injectByteWriterPrelude() {
+	hasByteWriterPrelude := false
+	if len(c.fn.Body.List) > 0 {
+		if x, ok := c.fn.Body.List[0].(*ast.DeclStmt); ok {
+			if xx, okk := x.Decl.(*ast.GenDecl); okk {
+				if y, okkk := xx.Specs[0].(*ast.ValueSpec); okkk {
+					hasByteWriterPrelude = y.Names[0].Name == c.bwriterName
+				}
+			}
+		}
+	}
+	if hasByteWriterPrelude == false {
+		alias := c.compiledProgram.addImport("bytes")
+		bufVar := getStmtsAst(`var ` + c.bwriterName + ` ` + alias + `.Buffer`)
+		c.fn.Body.List = append(bufVar, c.fn.Body.List...)
+	}
+}
 
 // func makeWriteErrorDecl() ast.Stmt {
 // 	return getStmtsAst(`var writeErr error`)[0]
@@ -1072,6 +1084,10 @@ var data ` + dataQualifier + `
 if d, ok := indata.(` + dataQualifier + `); ok {
   data = d
 }`)
+}
+
+func makeByteWriterPrelude(wname, bwname string) []ast.Stmt {
+	return getStmtsAst(`var ` + bwname + ` bytes.Buffer`)
 }
 
 func (c *converter) makeIoWrite(expr string, exprType reflect.Type) []ast.Stmt {

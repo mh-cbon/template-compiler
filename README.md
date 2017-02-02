@@ -180,34 +180,27 @@ available [here](https://github.com/mh-cbon/template-compiler/tree/master/demo/t
 
 ```sh
   $ go test -bench=. -benchmem
-  BenchmarkRenderWithCompiledTemplateA-4   	20000000	        88.0 ns/op	      48 B/op	       1 allocs/op
-  BenchmarkRenderWithJitTemplateA-4        	 3000000	       442 ns/op	      96 B/op	       2 allocs/op
-  BenchmarkRenderWithCompiledTemplateB-4   	20000000	        87.9 ns/op	      48 B/op	       1 allocs/op
-  BenchmarkRenderWithJitTemplateB-4        	 3000000	       442 ns/op	      96 B/op	       2 allocs/op
-  Print string: x6
+  BenchmarkRenderWithCompiledTemplateA-4   	20000000	       78.9 ns/op	      48 B/op	       1 allocs/op
+  BenchmarkRenderWithJitTemplateA-4        	 3000000	       668 ns/op	      96 B/op	       2 allocs/op
+  BenchmarkRenderWithCompiledTemplateB-4   	20000000	       82.4 ns/op	      48 B/op	       1 allocs/op
+  BenchmarkRenderWithJitTemplateB-4        	 3000000	       603 ns/op	      96 B/op	       2 allocs/op
+  BenchmarkRenderWithCompiledTemplateC-4   	  500000	      2530 ns/op	     192 B/op	       6 allocs/op
+  BenchmarkRenderWithJitTemplateC-4        	   50000	     38245 ns/op	    3641 B/op	      82 allocs/op
+  BenchmarkRenderWithCompiledTemplateD-4   	20000000	       114 ns/op	      48 B/op	       1 allocs/op
+  BenchmarkRenderWithJitTemplateD-4        	 3000000	       809 ns/op	     144 B/op	       3 allocs/op
 
-  BenchmarkRenderWithCompiledTemplateC-4   	  500000	      3288 ns/op	      80 B/op	       5 allocs/op
-  BenchmarkRenderWithJitTemplateC-4        	   50000	     25144 ns/op	    3352 B/op	      76 allocs/op
-  Print various data types: x10
+  // the next 2 benchmarks are particularly encouraging
+  // as they involve 2k html string escaping
+  BenchmarkRenderWithCompiledTemplateE-4   	   10000	    103929 ns/op	     160 B/op	       2 allocs/op
+  BenchmarkRenderWithJitTemplateE-4        	     300	   6207912 ns/op	  656598 B/op	   18012 allocs/op
+  BenchmarkRenderWithCompiledTemplateF-4   	   10000	    111047 ns/op	     160 B/op	       2 allocs/op
+  BenchmarkRenderWithJitTemplateF-4        	     200	   5836766 ns/op	  657000 B/op	   18024 allocs/op
 
-  BenchmarkRenderWithCompiledTemplateD-4   	10000000	       121 ns/op	      48 B/op	       1 allocs/op
-  BenchmarkRenderWithJitTemplateD-4        	 2000000	       593 ns/op	     144 B/op	       3 allocs/op
-  Use multiple templates: x5
-
-  BenchmarkRenderWithCompiledTemplateE-4   	  300000	      5041 ns/op	      48 B/op	       1 allocs/op
-  BenchmarkRenderWithJitTemplateE-4        	   30000	     50306 ns/op	    6970 B/op	     191 allocs/op
-  Range, if, funcs: x10
-
-  BenchmarkRenderWithCompiledTemplateF-4   	 5000000	       372 ns/op	      48 B/op	       1 allocs/op
-  BenchmarkRenderWithJitTemplateF-4        	  100000	     17643 ns/op	    2248 B/op	      61 allocs/op
-  Method call: x50
-
-  PASS
-  ok  	github.com/mh-cbon/template-compiler/demo	21.431s
 ```
 
-Generally speaking the more complex the template is,
-the more output you ll get.
+Depending on the kind of template expect 5 to 30 times faster.
+
+About allocations they will get way more stable, expect 2 alloctions per template.
 
 # Understanding
 

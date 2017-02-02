@@ -33,7 +33,7 @@ func NewCompiledTemplatesProgram(varName string) *CompiledTemplatesProgram {
 	ret := &CompiledTemplatesProgram{
 		varName: varName,
 		idents: []string{
-			"t", "w", "werr", "data", "indata", varName,
+			"t", "b", "w", "werr", "data", "indata", varName,
 		},
 		builtinTexts: map[string]string{},
 	}
@@ -179,6 +179,17 @@ func (c *CompiledTemplatesProgram) addImport(pkgpath string) string {
 	}
 	c.idents = append(c.idents, okAlias)
 	return okAlias
+}
+
+// hasImport tells if pkgPath is imported.
+func (c *CompiledTemplatesProgram) hasImport(pkgpath string) bool {
+	qpath := fmt.Sprintf("%q", pkgpath)
+	for _, i := range c.imports {
+		if i.Path.Value == qpath {
+			return true
+		}
+	}
+	return false
 }
 
 // isCollidingIdent tells if given ident will collide exisiting idents.
@@ -343,8 +354,6 @@ func (t TemplateToCompile) getDataConfiguration(name string) (compiled.DataConfi
 	if ret, ok := t.TemplatesDataConfiguration["*"]; ok {
 		return ret, nil
 	}
-	fmt.Printf("%#v\n", t.TemplatesData)
-	fmt.Printf("%#v\n", t.TemplatesDataConfiguration)
 	return compiled.DataConfiguration{}, fmt.Errorf("Template data configuration not found for %v", name)
 }
 

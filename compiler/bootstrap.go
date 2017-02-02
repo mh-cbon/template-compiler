@@ -429,7 +429,9 @@ func extractImports(file *ast.File) []*ast.ImportSpec {
 func formatGoCode(s string) string {
 	fmtExpected, err := format.Source([]byte(s))
 	if err != nil {
-		panic(err)
+		panic(
+			fmt.Errorf("%v\n%v", err, s),
+		)
 	}
 	return string(fmtExpected)
 }

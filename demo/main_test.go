@@ -55,11 +55,13 @@ func init() {
 	eCompiledTemplate = compiledTemplates.MustGet("e.tpl")
 	fCompiledTemplate = compiledTemplates.MustGet("f.tpl")
 
-	tplData.Some = "Some string"
-	for i := 0; i < 200; i++ {
+	tplData.Some = "Some string<>\"日本語"
+	for i := 0; i < 2000; i++ {
 		tplData.Items = append(tplData.Items, fmt.Sprintf("item %v", i))
 	}
 }
+
+var Discard = ioutil.Discard
 
 func TestTemplatesA(t *testing.T) {
 	var a bytes.Buffer
@@ -154,73 +156,73 @@ func TestTemplatesF(t *testing.T) {
 
 func BenchmarkRenderWithCompiledTemplateA(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		aCompiledTemplate.Execute(ioutil.Discard, tplData)
+		aCompiledTemplate.Execute(Discard, tplData)
 	}
 }
 
 func BenchmarkRenderWithJitTemplateA(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		aJitTemplate.Execute(ioutil.Discard, tplData)
+		aJitTemplate.Execute(Discard, tplData)
 	}
 }
 
 func BenchmarkRenderWithCompiledTemplateB(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		bCompiledTemplate.Execute(ioutil.Discard, tplData)
+		bCompiledTemplate.Execute(Discard, tplData)
 	}
 }
 
 func BenchmarkRenderWithJitTemplateB(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		bJitTemplate.Execute(ioutil.Discard, tplData)
+		bJitTemplate.Execute(Discard, tplData)
 	}
 }
 
 func BenchmarkRenderWithCompiledTemplateC(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		cCompiledTemplate.Execute(ioutil.Discard, tplData)
+		cCompiledTemplate.Execute(Discard, tplData)
 	}
 }
 
 func BenchmarkRenderWithJitTemplateC(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		cJitTemplate.Execute(ioutil.Discard, tplData)
+		cJitTemplate.Execute(Discard, tplData)
 	}
 }
 
 func BenchmarkRenderWithCompiledTemplateD(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		dCompiledTemplate.Execute(ioutil.Discard, tplData)
+		dCompiledTemplate.Execute(Discard, tplData)
 	}
 }
 
 func BenchmarkRenderWithJitTemplateD(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		dJitTemplate.Execute(ioutil.Discard, tplData)
+		dJitTemplate.Execute(Discard, tplData)
 	}
 }
 
 func BenchmarkRenderWithCompiledTemplateE(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		eCompiledTemplate.Execute(ioutil.Discard, tplData)
+		eCompiledTemplate.Execute(Discard, tplData)
 	}
 }
 
 func BenchmarkRenderWithJitTemplateE(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		eJitTemplate.Execute(ioutil.Discard, tplData)
+		eJitTemplate.Execute(Discard, tplData)
 	}
 }
 
 func BenchmarkRenderWithCompiledTemplateF(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		fCompiledTemplate.Execute(ioutil.Discard, tplData)
+		fCompiledTemplate.Execute(Discard, tplData)
 	}
 }
 
 func BenchmarkRenderWithJitTemplateF(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		fJitTemplate.Execute(ioutil.Discard, tplData)
+		fJitTemplate.Execute(Discard, tplData)
 	}
 }
 
