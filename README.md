@@ -145,26 +145,46 @@ func init () {
   compiledTemplates.Add("welcome.tpl", fnaTplaTpl0)
 }
 
+// only demonstration purpose, not the actual real generated code for the example template.
 func fnaTplaTpl0(t parse.Templater, w io.Writer, indata interface {
 }) error {
-  var data mypackage.TplData
-  if d, ok := indata.(mypackage.TplData); ok {
-  	data = d
+  var bw bytes.Buffer
+  var data aliasdata.MyTemplateData
+  if d, ok := indata.(aliasdata.MyTemplateData); ok {
+    data = d
   }
-  var writeErr error
-  var var0 string = data.Email
-  _, writeErr = w.Write(var0)
-  if writeErr != nil {
-  	return writeErr
+  if _, werr := w.Write(builtin5); werr != nil {
+    return werr
   }
-  _, writeErr = w.Write(builtin0)
-  if writeErr != nil {
-  	return writeErr
+  var var2 []string = data.MethodItems()
+  var var1 int = len(var2)
+  var var0 bool = 0 != var1
+  if var0 {
+    if _, werr := w.Write(builtin6); werr != nil {
+      return werr
+    }
+    var var3 []string = data.MethodItems()
+    for _, iterable := range var3 {
+      if _, werr := w.Write(builtin7); werr != nil {
+        return werr
+      }
+      bw.WriteString(iterable)
+      template.HTMLEscape(w, bw.Bytes())
+      bw.Reset()
+      if _, werr := w.Write(builtin8); werr != nil {
+        return werr
+      }
+    }
+    if _, werr := w.Write(builtin9); werr != nil {
+      return werr
+    }
+  } else {
+    if _, werr := w.Write(builtin10); werr != nil {
+      return werr
+    }
   }
-  var var1 string = data.Name
-  _, writeErr = w.Write(var0)
-  if writeErr != nil {
-  	return writeErr
+  if _, werr := w.Write(builtin2); werr != nil {
+    return werr
   }
   return nil
 }
